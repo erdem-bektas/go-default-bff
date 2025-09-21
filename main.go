@@ -12,6 +12,8 @@ package main
 
 import (
 	"fiber-app/internal/handlers"
+	"fiber-app/internal/services"
+	"fiber-app/pkg/cache"
 	"fiber-app/pkg/config"
 	"fiber-app/pkg/database"
 	"fiber-app/router"
@@ -58,6 +60,16 @@ func main() {
 	// Default rolleri oluştur
 	if err := database.SeedDefaultRoles(); err != nil {
 		zapLogger.Fatal("Default roles oluşturulamadı", zap.Error(err))
+	}
+
+	// Redis bağlantısı
+	if err := cache.Connect(cfg, zapLogger); err != nil {
+		zapLogger.Warn("Redis bağlantısı başarısız, cache devre dışı", zap.Error(err))
+	} else {
+		// Cache service'i başlat
+		cacheService := services.NewCacheService(zapLogger)
+		handlers.SetCacheService(cacheService)
+		zapLogger.Info("Cache service başlatıldı")
 	}
 
 	// Fiber app oluştur

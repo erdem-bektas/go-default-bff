@@ -47,6 +47,13 @@ func SetupRoutes(app *fiber.App) {
 	roles.Put("/:id", handlers.UpdateRole)
 	roles.Delete("/:id", handlers.DeleteRole)
 
+	// Cache routes
+	cache := api.Group("/cache")
+	cache.Get("/stats", handlers.GetCacheStats)
+	cache.Post("/flush", handlers.FlushCache)
+	cache.Get("/keys", handlers.GetCacheKeys)
+	cache.Delete("/keys/:key", handlers.DeleteCacheKey)
+
 	// Test routes
 	test := api.Group("/test")
 	test.Get("/", handlers.TestGet)

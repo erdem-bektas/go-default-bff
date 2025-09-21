@@ -46,6 +46,26 @@ func GetRoles(c *fiber.Ctx) error {
 		zap.Int("limit", limit),
 	)
 
+	// Eğer sayfa 1 ve limit 10 ise cache'den kontrol et
+	if page == 1 && limit == 10 && cacheService != nil {
+		if cachedRoles, err := cacheService.GetAllRoles(); err == nil {
+			zapLogger.Info("Roles cache'den getirildi",
+				zap.String("trace_id", traceID),
+			)
+			return c.JSON(fiber.Map{
+				"roles": cachedRoles,
+				"pagination": fiber.Map{
+					"page":        page,
+					"limit":       limit,
+					"total":       int64(len(cachedRoles)),
+					"total_pages": 1,
+				},
+				"trace_id": traceID,
+				"cached":   true,
+			})
+		}
+	}
+
 	var roles []models.Role
 	var total int64
 
@@ -71,6 +91,16 @@ func GetRoles(c *fiber.Ctx) error {
 			"error":    "Database hatası",
 			"trace_id": traceID,
 		})
+	}
+
+	// İlk sayfa ise cache'e kaydet
+	if page == 1 && limit == 10 && cacheService != nil {
+		if err := cacheService.SetAllRoles(roles); err != nil {
+			zapLogger.Warn("Roles cache'e kaydedilemedi",
+				zap.String("trace_id", traceID),
+				zap.Error(err),
+			)
+		}
 	}
 
 	return c.JSON(fiber.Map{
