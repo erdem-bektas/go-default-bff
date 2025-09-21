@@ -14,6 +14,17 @@ import (
 )
 
 // GetUsers - Tüm kullanıcıları listele
+// @Summary Kullanıcıları listele
+// @Description Sayfalama ve arama desteği ile kullanıcıları listele
+// @Tags Users
+// @Accept json
+// @Produce json
+// @Param page query int false "Sayfa numarası" default(1)
+// @Param limit query int false "Sayfa başına kayıt sayısı" default(10)
+// @Param search query string false "Arama terimi (isim veya email)"
+// @Success 200 {object} map[string]interface{}
+// @Failure 500 {object} map[string]interface{}
+// @Router /api/v1/users [get]
 func GetUsers(c *fiber.Ctx) error {
 	traceID := getTraceID(c)
 
@@ -85,6 +96,17 @@ func GetUsers(c *fiber.Ctx) error {
 }
 
 // GetUser - Tek kullanıcı getir
+// @Summary Kullanıcı detayı
+// @Description ID ile kullanıcı detayını getir
+// @Tags Users
+// @Accept json
+// @Produce json
+// @Param id path string true "User ID (UUID)"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]interface{}
+// @Failure 404 {object} map[string]interface{}
+// @Failure 500 {object} map[string]interface{}
+// @Router /api/v1/users/{id} [get]
 func GetUser(c *fiber.Ctx) error {
 	traceID := getTraceID(c)
 
@@ -137,6 +159,17 @@ func GetUser(c *fiber.Ctx) error {
 }
 
 // CreateUser - Yeni kullanıcı oluştur
+// @Summary Yeni kullanıcı oluştur
+// @Description Yeni kullanıcı kaydı oluştur
+// @Tags Users
+// @Accept json
+// @Produce json
+// @Param user body models.CreateUserRequest true "User bilgileri"
+// @Success 201 {object} map[string]interface{}
+// @Failure 400 {object} map[string]interface{}
+// @Failure 409 {object} map[string]interface{}
+// @Failure 500 {object} map[string]interface{}
+// @Router /api/v1/users [post]
 func CreateUser(c *fiber.Ctx) error {
 	traceID := getTraceID(c)
 
@@ -237,6 +270,19 @@ func CreateUser(c *fiber.Ctx) error {
 }
 
 // UpdateUser - Kullanıcı güncelle
+// @Summary Kullanıcı güncelle
+// @Description Mevcut kullanıcı bilgilerini güncelle
+// @Tags Users
+// @Accept json
+// @Produce json
+// @Param id path string true "User ID (UUID)"
+// @Param user body models.UpdateUserRequest true "Güncellenecek user bilgileri"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]interface{}
+// @Failure 404 {object} map[string]interface{}
+// @Failure 409 {object} map[string]interface{}
+// @Failure 500 {object} map[string]interface{}
+// @Router /api/v1/users/{id} [put]
 func UpdateUser(c *fiber.Ctx) error {
 	traceID := getTraceID(c)
 
@@ -383,6 +429,17 @@ func UpdateUser(c *fiber.Ctx) error {
 }
 
 // DeleteUser - Kullanıcı sil
+// @Summary Kullanıcı sil
+// @Description Kullanıcıyı sistemden sil
+// @Tags Users
+// @Accept json
+// @Produce json
+// @Param id path string true "User ID (UUID)"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]interface{}
+// @Failure 404 {object} map[string]interface{}
+// @Failure 500 {object} map[string]interface{}
+// @Router /api/v1/users/{id} [delete]
 func DeleteUser(c *fiber.Ctx) error {
 	traceID := getTraceID(c)
 

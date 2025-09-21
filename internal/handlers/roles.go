@@ -14,6 +14,16 @@ import (
 )
 
 // GetRoles - Tüm rolleri listele
+// @Summary Rolleri listele
+// @Description Sayfalama desteği ile rolleri listele
+// @Tags Roles
+// @Accept json
+// @Produce json
+// @Param page query int false "Sayfa numarası" default(1)
+// @Param limit query int false "Sayfa başına kayıt sayısı" default(10)
+// @Success 200 {object} map[string]interface{}
+// @Failure 500 {object} map[string]interface{}
+// @Router /api/v1/roles [get]
 func GetRoles(c *fiber.Ctx) error {
 	traceID := getTraceID(c)
 
@@ -76,6 +86,17 @@ func GetRoles(c *fiber.Ctx) error {
 }
 
 // GetRole - Tek rol getir
+// @Summary Rol detayı
+// @Description ID ile rol detayını getir
+// @Tags Roles
+// @Accept json
+// @Produce json
+// @Param id path string true "Role ID (UUID)"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]interface{}
+// @Failure 404 {object} map[string]interface{}
+// @Failure 500 {object} map[string]interface{}
+// @Router /api/v1/roles/{id} [get]
 func GetRole(c *fiber.Ctx) error {
 	traceID := getTraceID(c)
 
@@ -128,6 +149,17 @@ func GetRole(c *fiber.Ctx) error {
 }
 
 // CreateRole - Yeni rol oluştur
+// @Summary Yeni rol oluştur
+// @Description Yeni rol kaydı oluştur
+// @Tags Roles
+// @Accept json
+// @Produce json
+// @Param role body models.CreateRoleRequest true "Role bilgileri"
+// @Success 201 {object} map[string]interface{}
+// @Failure 400 {object} map[string]interface{}
+// @Failure 409 {object} map[string]interface{}
+// @Failure 500 {object} map[string]interface{}
+// @Router /api/v1/roles [post]
 func CreateRole(c *fiber.Ctx) error {
 	traceID := getTraceID(c)
 
@@ -194,6 +226,19 @@ func CreateRole(c *fiber.Ctx) error {
 }
 
 // UpdateRole - Rol güncelle
+// @Summary Rol güncelle
+// @Description Mevcut rol bilgilerini güncelle
+// @Tags Roles
+// @Accept json
+// @Produce json
+// @Param id path string true "Role ID (UUID)"
+// @Param role body models.UpdateRoleRequest true "Güncellenecek role bilgileri"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]interface{}
+// @Failure 404 {object} map[string]interface{}
+// @Failure 409 {object} map[string]interface{}
+// @Failure 500 {object} map[string]interface{}
+// @Router /api/v1/roles/{id} [put]
 func UpdateRole(c *fiber.Ctx) error {
 	traceID := getTraceID(c)
 
@@ -317,6 +362,18 @@ func UpdateRole(c *fiber.Ctx) error {
 }
 
 // DeleteRole - Rol sil
+// @Summary Rol sil
+// @Description Rolü sistemden sil (kullanımda değilse)
+// @Tags Roles
+// @Accept json
+// @Produce json
+// @Param id path string true "Role ID (UUID)"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]interface{}
+// @Failure 404 {object} map[string]interface{}
+// @Failure 409 {object} map[string]interface{}
+// @Failure 500 {object} map[string]interface{}
+// @Router /api/v1/roles/{id} [delete]
 func DeleteRole(c *fiber.Ctx) error {
 	traceID := getTraceID(c)
 

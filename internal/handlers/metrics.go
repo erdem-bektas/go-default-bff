@@ -9,6 +9,13 @@ import (
 )
 
 // GetMetrics - Uygulama metrikleri
+// @Summary Uygulama metrikleri
+// @Description Temel uygulama performans metrikleri
+// @Tags Metrics
+// @Accept json
+// @Produce json
+// @Success 200 {object} map[string]interface{}
+// @Router /api/v1/metrics [get]
 func GetMetrics(c *fiber.Ctx) error {
 	traceID := getTraceID(c)
 
@@ -46,6 +53,13 @@ func GetMetrics(c *fiber.Ctx) error {
 }
 
 // GetSystemMetrics - Sistem metrikleri
+// @Summary Detaylı sistem metrikleri
+// @Description Detaylı sistem ve runtime metrikleri
+// @Tags Metrics
+// @Accept json
+// @Produce json
+// @Success 200 {object} map[string]interface{}
+// @Router /api/v1/metrics/system [get]
 func GetSystemMetrics(c *fiber.Ctx) error {
 	traceID := getTraceID(c)
 

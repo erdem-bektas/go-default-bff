@@ -13,6 +13,8 @@ Go Fiber framework kullanarak oluşturulmuş web uygulaması. Air ile hot reload
 - 📊 **Metrics** - Detaylı sistem metrikleri
 - 🗄️ **PostgreSQL** - GORM ile database işlemleri
 - 👥 **User CRUD** - Kullanıcı yönetimi API'si
+- 🔐 **Role Management** - Rol tabanlı yetkilendirme
+- 📚 **Swagger UI** - API dokümantasyonu
 
 ## Kurulum
 
@@ -55,6 +57,15 @@ make run
 ### Build
 ```bash
 make build
+```
+
+### Swagger Dokümantasyonu
+```bash
+# Swagger docs oluştur
+make docs
+
+# Swagger tool kurulumu (eğer yoksa)
+make swagger-install
 ```
 
 ## API Endpoints
@@ -146,4 +157,18 @@ Air sayesinde kod değişikliklerinde otomatik restart:
 make dev
 ```
 
-Port: `3000`
+Port: `3003`
+
+## API Dokümantasyonu
+
+### Swagger UI
+Tüm API endpoint'lerini görüntülemek ve test etmek için:
+```
+http://localhost:3003/docs
+```
+
+### Swagger JSON
+API spesifikasyonu JSON formatında:
+```
+http://localhost:3003/swagger.json
+```

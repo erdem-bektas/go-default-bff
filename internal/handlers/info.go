@@ -9,6 +9,13 @@ import (
 )
 
 // GetAppInfo - Uygulama bilgileri
+// @Summary Uygulama bilgileri
+// @Description Uygulama hakkında detaylı bilgiler
+// @Tags Info
+// @Accept json
+// @Produce json
+// @Success 200 {object} map[string]interface{}
+// @Router /api/v1/info [get]
 func GetAppInfo(c *fiber.Ctx) error {
 	traceID := getTraceID(c)
 
@@ -56,6 +63,13 @@ func GetAppInfo(c *fiber.Ctx) error {
 }
 
 // GetVersion - Sadece versiyon bilgisi
+// @Summary Versiyon bilgisi
+// @Description Uygulama versiyon bilgileri
+// @Tags Info
+// @Accept json
+// @Produce json
+// @Success 200 {object} map[string]interface{}
+// @Router /api/v1/info/version [get]
 func GetVersion(c *fiber.Ctx) error {
 	traceID := getTraceID(c)
 

@@ -11,6 +11,13 @@ import (
 var startTime = time.Now()
 
 // HealthCheck - Genel sağlık kontrolü
+// @Summary Sağlık kontrolü
+// @Description Uygulamanın genel sağlık durumu
+// @Tags Health
+// @Accept json
+// @Produce json
+// @Success 200 {object} map[string]interface{}
+// @Router /api/v1/health [get]
 func HealthCheck(c *fiber.Ctx) error {
 	traceID := getTraceID(c)
 
@@ -31,6 +38,14 @@ func HealthCheck(c *fiber.Ctx) error {
 }
 
 // ReadinessCheck - Servisin hazır olup olmadığını kontrol eder
+// @Summary Hazırlık kontrolü
+// @Description Servisin istekleri karşılamaya hazır olup olmadığını kontrol eder
+// @Tags Health
+// @Accept json
+// @Produce json
+// @Success 200 {object} map[string]interface{}
+// @Failure 503 {object} map[string]interface{}
+// @Router /api/v1/health/ready [get]
 func ReadinessCheck(c *fiber.Ctx) error {
 	traceID := getTraceID(c)
 
@@ -69,6 +84,13 @@ func ReadinessCheck(c *fiber.Ctx) error {
 }
 
 // LivenessCheck - Servisin yaşayıp yaşamadığını kontrol eder
+// @Summary Canlılık kontrolü
+// @Description Servisin çalışır durumda olup olmadığını kontrol eder
+// @Tags Health
+// @Accept json
+// @Produce json
+// @Success 200 {object} map[string]interface{}
+// @Router /api/v1/health/live [get]
 func LivenessCheck(c *fiber.Ctx) error {
 	traceID := getTraceID(c)
 

@@ -1,3 +1,13 @@
+// @title Fiber App API
+// @version 1.0.0
+// @description Go Fiber app with PostgreSQL, GORM, Zap Logger, Trace ID and Role-based User Management
+// @contact.name API Support
+// @contact.email support@example.com
+// @license.name MIT
+// @license.url https://opensource.org/licenses/MIT
+// @host localhost:3003
+// @BasePath /
+// @schemes http
 package main
 
 import (

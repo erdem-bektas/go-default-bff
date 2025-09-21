@@ -23,6 +23,13 @@ func getTraceID(c *fiber.Ctx) string {
 }
 
 // Home - Ana sayfa
+// @Summary Ana sayfa
+// @Description Uygulama ana sayfası ve endpoint listesi
+// @Tags General
+// @Accept json
+// @Produce json
+// @Success 200 {object} map[string]interface{}
+// @Router / [get]
 func Home(c *fiber.Ctx) error {
 	traceID := getTraceID(c)
 
@@ -43,11 +50,22 @@ func Home(c *fiber.Ctx) error {
 			"roles":   "/api/v1/roles",
 			"test":    "/api/v1/test",
 		},
+		"documentation": fiber.Map{
+			"swagger_ui":   "/docs",
+			"swagger_json": "/swagger.json",
+		},
 		"trace_id": traceID,
 	})
 }
 
 // Ping - Basit ping endpoint
+// @Summary Ping endpoint
+// @Description Basit ping-pong testi
+// @Tags General
+// @Accept json
+// @Produce json
+// @Success 200 {object} map[string]interface{}
+// @Router /ping [get]
 func Ping(c *fiber.Ctx) error {
 	traceID := getTraceID(c)
 
