@@ -48,6 +48,7 @@ func Home(c *fiber.Ctx) error {
 			"info":    "/api/v1/info",
 			"users":   "/api/v1/users",
 			"roles":   "/api/v1/roles",
+			"cache":   "/api/v1/cache",
 			"test":    "/api/v1/test",
 		},
 		"documentation": fiber.Map{

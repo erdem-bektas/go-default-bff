@@ -132,6 +132,22 @@ func GetUser(c *fiber.Ctx) error {
 		zap.String("user_id", userID),
 	)
 
+	// Önce cache'den kontrol et
+	if cacheService != nil {
+		if cachedUser, err := cacheService.GetUser(id); err == nil {
+			zapLogger.Info("User cache'den getirildi",
+				zap.String("trace_id", traceID),
+				zap.String("user_id", userID),
+			)
+			return c.JSON(fiber.Map{
+				"user":     cachedUser,
+				"trace_id": traceID,
+				"cached":   true,
+			})
+		}
+	}
+
+	// Cache'de yoksa database'den getir
 	var user models.User
 	if err := database.DB.Preload("Role").First(&user, "id = ?", id).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -152,9 +168,21 @@ func GetUser(c *fiber.Ctx) error {
 		})
 	}
 
+	// Cache'e kaydet
+	if cacheService != nil {
+		if err := cacheService.SetUser(&user); err != nil {
+			zapLogger.Warn("User cache'e kaydedilemedi",
+				zap.String("trace_id", traceID),
+				zap.String("user_id", userID),
+				zap.Error(err),
+			)
+		}
+	}
+
 	return c.JSON(fiber.Map{
 		"user":     user,
 		"trace_id": traceID,
+		"cached":   false,
 	})
 }
 
@@ -416,6 +444,17 @@ func UpdateUser(c *fiber.Ctx) error {
 		})
 	}
 
+	// Cache'i invalidate et
+	if cacheService != nil {
+		if err := cacheService.InvalidateUserCaches(id); err != nil {
+			zapLogger.Warn("User cache invalidation başarısız",
+				zap.String("trace_id", traceID),
+				zap.String("user_id", userID),
+				zap.Error(err),
+			)
+		}
+	}
+
 	zapLogger.Info("User başarıyla güncellendi",
 		zap.String("trace_id", traceID),
 		zap.String("user_id", userID),
@@ -497,6 +536,17 @@ func DeleteUser(c *fiber.Ctx) error {
 			"error":    "Database hatası",
 			"trace_id": traceID,
 		})
+	}
+
+	// Cache'i invalidate et
+	if cacheService != nil {
+		if err := cacheService.InvalidateUserCaches(id); err != nil {
+			zapLogger.Warn("User cache invalidation başarısız",
+				zap.String("trace_id", traceID),
+				zap.String("user_id", userID),
+				zap.Error(err),
+			)
+		}
 	}
 
 	zapLogger.Info("User başarıyla silindi",

@@ -15,6 +15,7 @@ Go Fiber framework kullanarak oluşturulmuş web uygulaması. Air ile hot reload
 - 👥 **User CRUD** - Kullanıcı yönetimi API'si
 - 🔐 **Role Management** - Rol tabanlı yetkilendirme
 - 📚 **Swagger UI** - API dokümantasyonu
+- ⚡ **Redis Cache** - Yüksek performans cache sistemi
 
 ## Kurulum
 
@@ -22,6 +23,7 @@ Go Fiber framework kullanarak oluşturulmuş web uygulaması. Air ile hot reload
 - Go 1.21+
 - Air (hot reload için)
 - Docker & Docker Compose (PostgreSQL için)
+- Redis (cache için)
 
 ### Bağımlılıkları yükle
 ```bash
@@ -171,4 +173,27 @@ http://localhost:3003/docs
 API spesifikasyonu JSON formatında:
 ```
 http://localhost:3003/swagger.json
+```
+
+## Cache Sistemi
+
+### Redis Cache Özellikleri
+- **User Cache**: Kullanıcı detayları 15 dakika cache'lenir
+- **Role Cache**: Roller 30 dakika cache'lenir  
+- **Auto Invalidation**: Veri güncellendiğinde cache otomatik temizlenir
+- **Performance**: Cache hit'lerde 10x daha hızlı response
+
+### Cache Endpoint'leri
+```bash
+# Cache istatistikleri
+curl http://localhost:3003/api/v1/cache/stats
+
+# Cache key'lerini listele
+curl "http://localhost:3003/api/v1/cache/keys?pattern=user:*"
+
+# Cache'i temizle
+curl -X POST http://localhost:3003/api/v1/cache/flush
+
+# Belirli key'i sil
+curl -X DELETE http://localhost:3003/api/v1/cache/keys/user:uuid
 ```
