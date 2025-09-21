@@ -9,6 +9,15 @@ import (
 )
 
 // TestGet - GET test endpoint
+// @Summary GET test endpoint
+// @Description Test amaçlı GET endpoint
+// @Tags Test
+// @Accept json
+// @Produce json
+// @Param name query string false "İsim parametresi" default("anonymous")
+// @Param delay query int false "Gecikme (ms)" default(0)
+// @Success 200 {object} map[string]interface{}
+// @Router /api/v1/test [get]
 func TestGet(c *fiber.Ctx) error {
 	traceID := getTraceID(c)
 
@@ -37,6 +46,15 @@ func TestGet(c *fiber.Ctx) error {
 }
 
 // TestPost - POST test endpoint
+// @Summary POST test endpoint
+// @Description Test amaçlı POST endpoint
+// @Tags Test
+// @Accept json
+// @Produce json
+// @Param body body map[string]interface{} true "Test verisi"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]interface{}
+// @Router /api/v1/test [post]
 func TestPost(c *fiber.Ctx) error {
 	traceID := getTraceID(c)
 
@@ -67,6 +85,13 @@ func TestPost(c *fiber.Ctx) error {
 }
 
 // TestError - Hata test endpoint
+// @Summary Hata test endpoint
+// @Description Test amaçlı hata endpoint
+// @Tags Test
+// @Accept json
+// @Produce json
+// @Failure 500 {object} map[string]interface{}
+// @Router /api/v1/test/error [get]
 func TestError(c *fiber.Ctx) error {
 	traceID := getTraceID(c)
 

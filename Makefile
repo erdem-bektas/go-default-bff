@@ -38,3 +38,14 @@ db-logs:
 db-reset:
 	docker-compose down -v
 	docker-compose up -d postgres
+
+# Swagger işlemleri
+swagger-gen:
+	swag init
+
+swagger-install:
+	go install github.com/swaggo/swag/cmd/swag@latest
+
+docs: swagger-gen
+	@echo "Swagger docs generated!"
+	@echo "View at: http://localhost:3003/docs"

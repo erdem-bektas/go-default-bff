@@ -1,0 +1,683 @@
+basePath: /
+definitions:
+  models.CreateRoleRequest:
+    properties:
+      description:
+        type: string
+      name:
+        maxLength: 50
+        minLength: 2
+        type: string
+    required:
+    - name
+    type: object
+  models.CreateUserRequest:
+    properties:
+      active:
+        type: boolean
+      age:
+        maximum: 150
+        minimum: 0
+        type: integer
+      email:
+        type: string
+      name:
+        maxLength: 100
+        minLength: 2
+        type: string
+      role_id:
+        type: string
+    required:
+    - email
+    - name
+    - role_id
+    type: object
+  models.UpdateRoleRequest:
+    properties:
+      description:
+        type: string
+      name:
+        maxLength: 50
+        minLength: 2
+        type: string
+    type: object
+  models.UpdateUserRequest:
+    properties:
+      active:
+        type: boolean
+      age:
+        maximum: 150
+        minimum: 0
+        type: integer
+      email:
+        type: string
+      name:
+        maxLength: 100
+        minLength: 2
+        type: string
+      role_id:
+        type: string
+    type: object
+host: localhost:3003
+info:
+  contact:
+    email: support@example.com
+    name: API Support
+  description: Go Fiber app with PostgreSQL, GORM, Zap Logger, Trace ID and Role-based
+    User Management
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+  title: Fiber App API
+  version: 1.0.0
+paths:
+  /:
+    get:
+      consumes:
+      - application/json
+      description: Uygulama ana sayfası ve endpoint listesi
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Ana sayfa
+      tags:
+      - General
+  /api/v1/health:
+    get:
+      consumes:
+      - application/json
+      description: Uygulamanın genel sağlık durumu
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Sağlık kontrolü
+      tags:
+      - Health
+  /api/v1/health/live:
+    get:
+      consumes:
+      - application/json
+      description: Servisin çalışır durumda olup olmadığını kontrol eder
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Canlılık kontrolü
+      tags:
+      - Health
+  /api/v1/health/ready:
+    get:
+      consumes:
+      - application/json
+      description: Servisin istekleri karşılamaya hazır olup olmadığını kontrol eder
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "503":
+          description: Service Unavailable
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Hazırlık kontrolü
+      tags:
+      - Health
+  /api/v1/info:
+    get:
+      consumes:
+      - application/json
+      description: Uygulama hakkında detaylı bilgiler
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Uygulama bilgileri
+      tags:
+      - Info
+  /api/v1/info/version:
+    get:
+      consumes:
+      - application/json
+      description: Uygulama versiyon bilgileri
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Versiyon bilgisi
+      tags:
+      - Info
+  /api/v1/metrics:
+    get:
+      consumes:
+      - application/json
+      description: Temel uygulama performans metrikleri
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Uygulama metrikleri
+      tags:
+      - Metrics
+  /api/v1/metrics/system:
+    get:
+      consumes:
+      - application/json
+      description: Detaylı sistem ve runtime metrikleri
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Detaylı sistem metrikleri
+      tags:
+      - Metrics
+  /api/v1/roles:
+    get:
+      consumes:
+      - application/json
+      description: Sayfalama desteği ile rolleri listele
+      parameters:
+      - default: 1
+        description: Sayfa numarası
+        in: query
+        name: page
+        type: integer
+      - default: 10
+        description: Sayfa başına kayıt sayısı
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Rolleri listele
+      tags:
+      - Roles
+    post:
+      consumes:
+      - application/json
+      description: Yeni rol kaydı oluştur
+      parameters:
+      - description: Role bilgileri
+        in: body
+        name: role
+        required: true
+        schema:
+          $ref: '#/definitions/models.CreateRoleRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "409":
+          description: Conflict
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Yeni rol oluştur
+      tags:
+      - Roles
+  /api/v1/roles/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: Rolü sistemden sil (kullanımda değilse)
+      parameters:
+      - description: Role ID (UUID)
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties: true
+            type: object
+        "409":
+          description: Conflict
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Rol sil
+      tags:
+      - Roles
+    get:
+      consumes:
+      - application/json
+      description: ID ile rol detayını getir
+      parameters:
+      - description: Role ID (UUID)
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Rol detayı
+      tags:
+      - Roles
+    put:
+      consumes:
+      - application/json
+      description: Mevcut rol bilgilerini güncelle
+      parameters:
+      - description: Role ID (UUID)
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Güncellenecek role bilgileri
+        in: body
+        name: role
+        required: true
+        schema:
+          $ref: '#/definitions/models.UpdateRoleRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties: true
+            type: object
+        "409":
+          description: Conflict
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Rol güncelle
+      tags:
+      - Roles
+  /api/v1/test:
+    get:
+      consumes:
+      - application/json
+      description: Test amaçlı GET endpoint
+      parameters:
+      - default: '"anonymous"'
+        description: İsim parametresi
+        in: query
+        name: name
+        type: string
+      - default: 0
+        description: Gecikme (ms)
+        in: query
+        name: delay
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      summary: GET test endpoint
+      tags:
+      - Test
+    post:
+      consumes:
+      - application/json
+      description: Test amaçlı POST endpoint
+      parameters:
+      - description: Test verisi
+        in: body
+        name: body
+        required: true
+        schema:
+          additionalProperties: true
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+      summary: POST test endpoint
+      tags:
+      - Test
+  /api/v1/test/error:
+    get:
+      consumes:
+      - application/json
+      description: Test amaçlı hata endpoint
+      produces:
+      - application/json
+      responses:
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Hata test endpoint
+      tags:
+      - Test
+  /api/v1/users:
+    get:
+      consumes:
+      - application/json
+      description: Sayfalama ve arama desteği ile kullanıcıları listele
+      parameters:
+      - default: 1
+        description: Sayfa numarası
+        in: query
+        name: page
+        type: integer
+      - default: 10
+        description: Sayfa başına kayıt sayısı
+        in: query
+        name: limit
+        type: integer
+      - description: Arama terimi (isim veya email)
+        in: query
+        name: search
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Kullanıcıları listele
+      tags:
+      - Users
+    post:
+      consumes:
+      - application/json
+      description: Yeni kullanıcı kaydı oluştur
+      parameters:
+      - description: User bilgileri
+        in: body
+        name: user
+        required: true
+        schema:
+          $ref: '#/definitions/models.CreateUserRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "409":
+          description: Conflict
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Yeni kullanıcı oluştur
+      tags:
+      - Users
+  /api/v1/users/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: Kullanıcıyı sistemden sil
+      parameters:
+      - description: User ID (UUID)
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Kullanıcı sil
+      tags:
+      - Users
+    get:
+      consumes:
+      - application/json
+      description: ID ile kullanıcı detayını getir
+      parameters:
+      - description: User ID (UUID)
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Kullanıcı detayı
+      tags:
+      - Users
+    put:
+      consumes:
+      - application/json
+      description: Mevcut kullanıcı bilgilerini güncelle
+      parameters:
+      - description: User ID (UUID)
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Güncellenecek user bilgileri
+        in: body
+        name: user
+        required: true
+        schema:
+          $ref: '#/definitions/models.UpdateUserRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties: true
+            type: object
+        "409":
+          description: Conflict
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Kullanıcı güncelle
+      tags:
+      - Users
+  /ping:
+    get:
+      consumes:
+      - application/json
+      description: Basit ping-pong testi
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Ping endpoint
+      tags:
+      - General
+schemes:
+- http
+swagger: "2.0"
