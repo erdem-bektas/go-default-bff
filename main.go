@@ -12,6 +12,7 @@ package main
 
 import (
 	"fiber-app/internal/handlers"
+	"fiber-app/internal/middleware"
 	"fiber-app/internal/services"
 	"fiber-app/pkg/cache"
 	"fiber-app/pkg/config"
@@ -70,6 +71,23 @@ func main() {
 		cacheService := services.NewCacheService(zapLogger)
 		handlers.SetCacheService(cacheService)
 		zapLogger.Info("Cache service başlatıldı")
+	}
+
+	// Auth service'i başlat
+	if cfg.Zitadel.ClientID != "" && cfg.Zitadel.ClientSecret != "" {
+		authService := services.NewAuthService(&cfg.Zitadel, zapLogger)
+		handlers.SetAuthService(authService)
+
+		// Auth middleware'i başlat
+		authMiddleware := middleware.NewAuthMiddleware(authService, zapLogger)
+		_ = authMiddleware // Şimdilik kullanılmıyor, route'larda kullanılacak
+
+		zapLogger.Info("Auth service başlatıldı",
+			zap.String("domain", cfg.Zitadel.Domain),
+			zap.String("redirect_url", cfg.Zitadel.RedirectURL),
+		)
+	} else {
+		zapLogger.Warn("Zitadel yapılandırılmamış, auth devre dışı")
 	}
 
 	// Fiber app oluştur

@@ -257,6 +257,14 @@ func SetupRoutes(app *fiber.App) {
 		return c.SendString(html)
 	})
 
+	// Auth routes
+	auth := app.Group("/auth")
+	auth.Get("/login", handlers.Login)
+	auth.Get("/login/redirect", handlers.LoginRedirect)
+	auth.Get("/callback", handlers.Callback)
+	auth.Post("/logout", handlers.Logout)
+	auth.Get("/profile", handlers.Profile)
+
 	// Root routes
 	app.Get("/", handlers.Home)
 	app.Get("/ping", handlers.Ping)

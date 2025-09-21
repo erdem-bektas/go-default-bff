@@ -11,6 +11,7 @@ type Config struct {
 	AppEnv   string
 	Database DatabaseConfig
 	Redis    RedisConfig
+	Zitadel  ZitadelConfig
 }
 
 type DatabaseConfig struct {
@@ -27,6 +28,14 @@ type RedisConfig struct {
 	Port     string
 	Password string
 	DB       int
+}
+
+type ZitadelConfig struct {
+	Domain       string
+	ClientID     string
+	ClientSecret string
+	RedirectURL  string
+	Scopes       []string
 }
 
 func Load() *Config {
@@ -47,6 +56,13 @@ func Load() *Config {
 			Port:     getEnv("REDIS_PORT", "6379"),
 			Password: getEnv("REDIS_PASSWORD", ""),
 			DB:       getEnvAsInt("REDIS_DB", 0),
+		},
+		Zitadel: ZitadelConfig{
+			Domain:       getEnv("ZITADEL_DOMAIN", "http://localhost:8080"),
+			ClientID:     getEnv("ZITADEL_CLIENT_ID", ""),
+			ClientSecret: getEnv("ZITADEL_CLIENT_SECRET", ""),
+			RedirectURL:  getEnv("ZITADEL_REDIRECT_URL", "http://localhost:3003/auth/callback"),
+			Scopes:       []string{"openid", "profile", "email", "urn:zitadel:iam:org:project:roles"},
 		},
 	}
 }
