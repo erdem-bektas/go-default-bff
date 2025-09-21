@@ -1,7 +1,7 @@
 package router
 
 import (
-	"fiber-app/router/handlers"
+	"fiber-app/internal/handlers"
 
 	"github.com/gofiber/fiber/v2"
 )
@@ -33,6 +33,14 @@ func SetupRoutes(app *fiber.App) {
 	users.Post("/", handlers.CreateUser)
 	users.Put("/:id", handlers.UpdateUser)
 	users.Delete("/:id", handlers.DeleteUser)
+
+	// Role routes
+	roles := api.Group("/roles")
+	roles.Get("/", handlers.GetRoles)
+	roles.Get("/:id", handlers.GetRole)
+	roles.Post("/", handlers.CreateRole)
+	roles.Put("/:id", handlers.UpdateRole)
+	roles.Delete("/:id", handlers.DeleteRole)
 
 	// Test routes
 	test := api.Group("/test")
