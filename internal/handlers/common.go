@@ -39,6 +39,8 @@ func Home(c *fiber.Ctx) error {
 			"health":  "/api/v1/health",
 			"metrics": "/api/v1/metrics",
 			"info":    "/api/v1/info",
+			"users":   "/api/v1/users",
+			"roles":   "/api/v1/roles",
 			"test":    "/api/v1/test",
 		},
 		"trace_id": traceID,

@@ -1,10 +1,10 @@
 package main
 
 import (
-	"fiber-app/config"
-	"fiber-app/database"
+	"fiber-app/internal/handlers"
+	"fiber-app/pkg/config"
+	"fiber-app/pkg/database"
 	"fiber-app/router"
-	"fiber-app/router/handlers"
 	"log"
 	"os"
 	"os/signal"
@@ -43,6 +43,11 @@ func main() {
 	// Database migration
 	if err := database.Migrate(); err != nil {
 		zapLogger.Fatal("Database migration başarısız", zap.Error(err))
+	}
+
+	// Default rolleri oluştur
+	if err := database.SeedDefaultRoles(); err != nil {
+		zapLogger.Fatal("Default roles oluşturulamadı", zap.Error(err))
 	}
 
 	// Fiber app oluştur

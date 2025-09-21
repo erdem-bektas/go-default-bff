@@ -2,7 +2,8 @@ package handlers
 
 import (
 	"errors"
-	"fiber-app/database"
+	"fiber-app/internal/models"
+	"fiber-app/pkg/database"
 	"strconv"
 	"strings"
 
@@ -37,10 +38,10 @@ func GetUsers(c *fiber.Ctx) error {
 		zap.String("search", search),
 	)
 
-	var users []database.User
+	var users []models.User
 	var total int64
 
-	query := database.DB.Model(&database.User{})
+	query := database.DB.Model(&models.User{}).Preload("Role")
 
 	// Arama filtresi
 	if search != "" {
@@ -109,8 +110,8 @@ func GetUser(c *fiber.Ctx) error {
 		zap.String("user_id", userID),
 	)
 
-	var user database.User
-	if err := database.DB.First(&user, "id = ?", id).Error; err != nil {
+	var user models.User
+	if err := database.DB.Preload("Role").First(&user, "id = ?", id).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
 				"error":    "User bulunamadı",
@@ -139,7 +140,7 @@ func GetUser(c *fiber.Ctx) error {
 func CreateUser(c *fiber.Ctx) error {
 	traceID := getTraceID(c)
 
-	var req database.CreateUserRequest
+	var req models.CreateUserRequest
 	if err := c.BodyParser(&req); err != nil {
 		zapLogger.Error("User create body parse hatası",
 			zap.String("trace_id", traceID),
@@ -166,17 +167,34 @@ func CreateUser(c *fiber.Ctx) error {
 		})
 	}
 
+	// Role kontrolü
+	var role models.Role
+	if err := database.DB.First(&role, "id = ?", req.RoleID).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+				"error":    "Geçersiz role ID",
+				"trace_id": traceID,
+			})
+		}
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error":    "Database hatası",
+			"trace_id": traceID,
+		})
+	}
+
 	zapLogger.Info("Yeni user oluşturuluyor",
 		zap.String("trace_id", traceID),
 		zap.String("name", req.Name),
 		zap.String("email", req.Email),
+		zap.String("role", role.Name),
 	)
 
-	user := database.User{
+	user := models.User{
 		Name:   req.Name,
 		Email:  req.Email,
 		Age:    req.Age,
 		Active: true,
+		RoleID: req.RoleID,
 	}
 
 	if req.Active != nil {
@@ -202,6 +220,9 @@ func CreateUser(c *fiber.Ctx) error {
 			"trace_id": traceID,
 		})
 	}
+
+	// Role bilgisini yükle
+	database.DB.Preload("Role").First(&user, user.ID)
 
 	zapLogger.Info("User başarıyla oluşturuldu",
 		zap.String("trace_id", traceID),
@@ -236,7 +257,7 @@ func UpdateUser(c *fiber.Ctx) error {
 		})
 	}
 
-	var req database.UpdateUserRequest
+	var req models.UpdateUserRequest
 	if err := c.BodyParser(&req); err != nil {
 		zapLogger.Error("User update body parse hatası",
 			zap.String("trace_id", traceID),
@@ -254,8 +275,8 @@ func UpdateUser(c *fiber.Ctx) error {
 	)
 
 	// Önce user'ın var olup olmadığını kontrol et
-	var user database.User
-	if err := database.DB.First(&user, "id = ?", id).Error; err != nil {
+	var user models.User
+	if err := database.DB.Preload("Role").First(&user, "id = ?", id).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
 				"error":    "User bulunamadı",
@@ -289,6 +310,23 @@ func UpdateUser(c *fiber.Ctx) error {
 	if req.Active != nil {
 		updates["active"] = *req.Active
 	}
+	if req.RoleID != nil {
+		// Role kontrolü
+		var role models.Role
+		if err := database.DB.First(&role, "id = ?", *req.RoleID).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+					"error":    "Geçersiz role ID",
+					"trace_id": traceID,
+				})
+			}
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"error":    "Database hatası",
+				"trace_id": traceID,
+			})
+		}
+		updates["role_id"] = *req.RoleID
+	}
 
 	if len(updates) == 0 {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
@@ -320,7 +358,7 @@ func UpdateUser(c *fiber.Ctx) error {
 	}
 
 	// Güncellenmiş user'ı getir
-	if err := database.DB.First(&user, "id = ?", id).Error; err != nil {
+	if err := database.DB.Preload("Role").First(&user, "id = ?", id).Error; err != nil {
 		zapLogger.Error("Güncellenmiş user getirme hatası",
 			zap.String("trace_id", traceID),
 			zap.String("user_id", userID),
@@ -371,8 +409,8 @@ func DeleteUser(c *fiber.Ctx) error {
 	)
 
 	// Önce user'ın var olup olmadığını kontrol et
-	var user database.User
-	if err := database.DB.First(&user, "id = ?", id).Error; err != nil {
+	var user models.User
+	if err := database.DB.Preload("Role").First(&user, "id = ?", id).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
 				"error":    "User bulunamadı",

@@ -1,7 +1,8 @@
 package database
 
 import (
-	"fiber-app/config"
+	"fiber-app/internal/models"
+	"fiber-app/pkg/config"
 	"fmt"
 
 	"go.uber.org/zap"
@@ -43,5 +44,31 @@ func Connect(cfg *config.Config, zapLogger *zap.Logger) error {
 }
 
 func Migrate() error {
-	return DB.AutoMigrate(&User{})
+	return DB.AutoMigrate(
+		&models.Role{},
+		&models.User{},
+	)
+}
+
+func SeedDefaultRoles() error {
+	roles := []models.Role{
+		{Name: "admin", Description: "System administrator with full access"},
+		{Name: "user", Description: "Regular user with limited access"},
+		{Name: "moderator", Description: "Moderator with content management access"},
+	}
+
+	for _, role := range roles {
+		var existingRole models.Role
+		if err := DB.Where("name = ?", role.Name).First(&existingRole).Error; err != nil {
+			if err == gorm.ErrRecordNotFound {
+				if err := DB.Create(&role).Error; err != nil {
+					return err
+				}
+			} else {
+				return err
+			}
+		}
+	}
+
+	return nil
 }
