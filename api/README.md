@@ -16,6 +16,7 @@ Go Fiber framework kullanarak oluşturulmuş web uygulaması. Air ile hot reload
 - 🔐 **Role Management** - Rol tabanlı yetkilendirme
 - 📚 **Swagger UI** - API dokümantasyonu
 - ⚡ **Redis Cache** - Yüksek performans cache sistemi
+- 🔐 **Zitadel Auth** - OAuth2/OIDC kimlik doğrulama
 
 ## Kurulum
 
@@ -24,6 +25,7 @@ Go Fiber framework kullanarak oluşturulmuş web uygulaması. Air ile hot reload
 - Air (hot reload için)
 - Docker & Docker Compose (PostgreSQL için)
 - Redis (cache için)
+- Zitadel (authentication için)
 
 ### Bağımlılıkları yükle
 ```bash
@@ -42,6 +44,12 @@ make db-up
 
 # Database loglarını izle
 make db-logs
+
+# Zitadel'i başlat
+make zitadel-up
+
+# Zitadel loglarını izle
+make zitadel-logs
 ```
 
 ## Çalıştırma
@@ -197,3 +205,35 @@ curl -X POST http://localhost:3003/api/v1/cache/flush
 # Belirli key'i sil
 curl -X DELETE http://localhost:3003/api/v1/cache/keys/user:uuid
 ```
+
+## Authentication (Zitadel)
+
+### OAuth2/OIDC Flow
+1. **Login**: `GET /auth/login` - OAuth2 authorization URL alın
+2. **Callback**: `GET /auth/callback` - Authorization code ile token alın
+3. **Profile**: `GET /auth/profile` - Kullanıcı profil bilgileri
+4. **Logout**: `POST /auth/logout` - Oturumu sonlandır
+
+### Zitadel Kurulumu
+```bash
+# Zitadel'i başlat
+make zitadel-up
+
+# Zitadel admin paneli: http://localhost:8080
+# İlk kurulumda admin kullanıcısı oluşturun
+# Project ve Application oluşturup CLIENT_ID ve CLIENT_SECRET alın
+```
+
+### Environment Variables
+```bash
+ZITADEL_DOMAIN=http://localhost:8080
+ZITADEL_CLIENT_ID=your_client_id
+ZITADEL_CLIENT_SECRET=your_client_secret
+ZITADEL_REDIRECT_URL=http://localhost:3003/auth/callback
+```
+
+### Protected Endpoints
+Bazı endpoint'ler authentication gerektirir:
+- User management (admin rolü)
+- Cache management (admin/moderator rolü)
+- Profile bilgileri (authenticated user)

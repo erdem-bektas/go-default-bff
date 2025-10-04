@@ -49,3 +49,17 @@ swagger-install:
 docs: swagger-gen
 	@echo "Swagger docs generated!"
 	@echo "View at: http://localhost:3003/docs"
+
+# Zitadel işlemleri
+zitadel-up:
+	docker-compose up -d zitadel-db zitadel
+
+zitadel-down:
+	docker-compose stop zitadel zitadel-db
+
+zitadel-logs:
+	docker-compose logs -f zitadel
+
+zitadel-reset:
+	docker-compose down -v zitadel zitadel-db
+	docker-compose up -d zitadel-db zitadel
