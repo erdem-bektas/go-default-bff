@@ -295,6 +295,7 @@ hs_err_pid*
 *.cert
 *.p12
 *.pfx
+*.pat
 id_rsa
 id_dsa
 id_ecdsa
