@@ -1,0 +1,54 @@
+# Production Terraform Variables
+# Copy this file to terraform.tfvars and update with your values
+
+# Hetzner Server Configuration
+hetzner_server_ip = "YOUR_HETZNER_SERVER_IP"
+
+# Zitadel Configuration
+zitadel_domain = "auth.yourdomain.com"
+zitadel_port = "443"
+zitadel_insecure = false
+
+# Vault Configuration
+vault_address = "https://vault.yourdomain.com"
+
+# Production SaaS Organizations
+production_saas_organizations = {
+  saas1 = {
+    name        = "Your SaaS 1"
+    domain      = "saas1.yourdomain.com"
+    admin_email = "admin@saas1.yourdomain.com"
+    admin_password = "CHANGE_THIS_SECURE_PASSWORD_123!@#"
+    features = {
+      login_policy_allow_register = false
+      login_policy_allow_username_password = true
+      login_policy_allow_external_idp = true
+      password_complexity_policy = {
+        min_length    = 12
+        has_uppercase = true
+        has_lowercase = true
+        has_number    = true
+        has_symbol    = true
+      }
+    }
+  }
+  
+  saas2 = {
+    name        = "Your SaaS 2"
+    domain      = "saas2.yourdomain.com"
+    admin_email = "admin@saas2.yourdomain.com"
+    admin_password = "CHANGE_THIS_SECURE_PASSWORD_456!@#"
+    features = {
+      login_policy_allow_register = false
+      login_policy_allow_username_password = true
+      login_policy_allow_external_idp = true
+      password_complexity_policy = {
+        min_length    = 12
+        has_uppercase = true
+        has_lowercase = true
+        has_number    = true
+        has_symbol    = true
+      }
+    }
+  }
+}
