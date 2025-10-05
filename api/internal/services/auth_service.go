@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"encoding/json"
+	"fiber-app/internal/models"
 	"fiber-app/pkg/config"
 	"fmt"
 	"net/http"
@@ -24,29 +25,18 @@ type AuthService struct {
 	oidcConfig     *OIDCConfiguration
 }
 
-type ZitadelUserInfo struct {
-	Sub               string   `json:"sub"`
-	Name              string   `json:"name"`
-	GivenName         string   `json:"given_name"`
-	FamilyName        string   `json:"family_name"`
-	PreferredUsername string   `json:"preferred_username"`
-	Email             string   `json:"email"`
-	EmailVerified     bool     `json:"email_verified"`
-	Roles             []string `json:"urn:zitadel:iam:org:project:roles"`
-}
-
 type AuthURLResponse struct {
 	URL   string `json:"url"`
 	State string `json:"state"`
 }
 
-func NewAuthService(cfg *config.ZitadelConfig, logger *zap.Logger) *AuthService {
+func NewAuthService(cfg *config.ZitadelConfig, securityCfg *config.SecurityConfig, logger *zap.Logger) *AuthService {
 	service := &AuthService{
 		config:         cfg,
 		logger:         logger,
 		oidcService:    NewOIDCDiscoveryService(logger),
 		pkceService:    NewPKCEService(logger),
-		sessionService: NewSessionService(logger),
+		sessionService: NewSessionService(logger, securityCfg.SessionEncryptionKey, securityCfg.CSRFSecretKey),
 	}
 
 	// Initialize OIDC discovery
@@ -181,7 +171,7 @@ func (as *AuthService) ExchangeCodeForToken(ctx context.Context, code, state str
 }
 
 // GetUserInfo - Access token ile kullanıcı bilgilerini al
-func (as *AuthService) GetUserInfo(ctx context.Context, token *oauth2.Token) (*ZitadelUserInfo, error) {
+func (as *AuthService) GetUserInfo(ctx context.Context, token *oauth2.Token) (*models.ZitadelUserInfo, error) {
 	client := as.oauthConfig.Client(ctx, token)
 
 	userInfoURL := fmt.Sprintf("%s/oidc/v1/userinfo", as.config.Domain)
@@ -199,7 +189,7 @@ func (as *AuthService) GetUserInfo(ctx context.Context, token *oauth2.Token) (*Z
 		return nil, fmt.Errorf("user info request failed with status: %d", resp.StatusCode)
 	}
 
-	var userInfo ZitadelUserInfo
+	var userInfo models.ZitadelUserInfo
 	if err := json.NewDecoder(resp.Body).Decode(&userInfo); err != nil {
 		as.logger.Error("Failed to decode user info", zap.Error(err))
 		return nil, err
@@ -229,7 +219,7 @@ func (as *AuthService) ValidateToken(ctx context.Context, tokenString string) (*
 }
 
 // HasRole - Kullanıcının belirli bir role'ü var mı kontrol et
-func (as *AuthService) HasRole(userInfo *ZitadelUserInfo, requiredRole string) bool {
+func (as *AuthService) HasRole(userInfo *models.ZitadelUserInfo, requiredRole string) bool {
 	for _, role := range userInfo.Roles {
 		if role == requiredRole {
 			return true
@@ -239,7 +229,7 @@ func (as *AuthService) HasRole(userInfo *ZitadelUserInfo, requiredRole string) b
 }
 
 // HasAnyRole - Kullanıcının herhangi bir role'ü var mı kontrol et
-func (as *AuthService) HasAnyRole(userInfo *ZitadelUserInfo, requiredRoles []string) bool {
+func (as *AuthService) HasAnyRole(userInfo *models.ZitadelUserInfo, requiredRoles []string) bool {
 	for _, userRole := range userInfo.Roles {
 		for _, requiredRole := range requiredRoles {
 			if userRole == requiredRole {
@@ -251,8 +241,8 @@ func (as *AuthService) HasAnyRole(userInfo *ZitadelUserInfo, requiredRoles []str
 }
 
 // CreateSession - Kullanıcı için session oluştur
-func (as *AuthService) CreateSession(userInfo *ZitadelUserInfo) (*Session, error) {
-	return as.sessionService.CreateSession(userInfo)
+func (as *AuthService) CreateSession(userInfo *models.ZitadelUserInfo, refreshTokenID, projectID string) (*Session, error) {
+	return as.sessionService.CreateSession(userInfo, refreshTokenID, projectID)
 }
 
 // GetSession - Session'ı getir

@@ -12,6 +12,7 @@ type Config struct {
 	Database DatabaseConfig
 	Redis    RedisConfig
 	Zitadel  ZitadelConfig
+	Security SecurityConfig
 }
 
 type DatabaseConfig struct {
@@ -31,13 +32,24 @@ type RedisConfig struct {
 }
 
 type ZitadelConfig struct {
-	Domain       string
-	ClientID     string
-	ClientSecret string
-	RedirectURL  string
-	Scopes       []string
-	Issuer       string
-	JWKSURL      string
+	Domain        string
+	ClientID      string
+	ClientSecret  string
+	RedirectURL   string
+	Scopes        []string
+	Issuer        string
+	JWKSURL       string
+	OrgID         string
+	ProjectID     string
+	RoleClaimName string
+}
+
+type SecurityConfig struct {
+	SessionEncryptionKey string
+	CSRFSecretKey        string
+	CookieDomain         string
+	CookieSecure         bool
+	CookieSameSite       string
 }
 
 func Load() *Config {
@@ -60,13 +72,23 @@ func Load() *Config {
 			DB:       getEnvAsInt("REDIS_DB", 0),
 		},
 		Zitadel: ZitadelConfig{
-			Domain:       getEnv("ZITADEL_DOMAIN", "http://localhost:8080"),
-			ClientID:     getEnv("ZITADEL_CLIENT_ID", ""),
-			ClientSecret: getEnv("ZITADEL_CLIENT_SECRET", ""),
-			RedirectURL:  getEnv("ZITADEL_REDIRECT_URL", "http://localhost:3003/auth/callback"),
-			Scopes:       []string{"openid", "profile", "email", "offline_access"},
-			Issuer:       getEnv("ZITADEL_ISSUER", "http://localhost:8080"),
-			JWKSURL:      getEnv("ZITADEL_JWKS_URL", ""),
+			Domain:        getEnv("ZITADEL_DOMAIN", "http://localhost:8080"),
+			ClientID:      getEnv("ZITADEL_CLIENT_ID", ""),
+			ClientSecret:  getEnv("ZITADEL_CLIENT_SECRET", ""),
+			RedirectURL:   getEnv("ZITADEL_REDIRECT_URL", "http://localhost:3003/auth/callback"),
+			Scopes:        []string{"openid", "profile", "email", "offline_access"},
+			Issuer:        getEnv("ZITADEL_ISSUER", "http://localhost:8080"),
+			JWKSURL:       getEnv("ZITADEL_JWKS_URL", ""),
+			OrgID:         getEnv("ZITADEL_ORG_ID", ""),
+			ProjectID:     getEnv("ZITADEL_PROJECT_ID", ""),
+			RoleClaimName: getEnv("ZITADEL_ROLE_CLAIM_NAME", "urn:zitadel:iam:org:project:roles"),
+		},
+		Security: SecurityConfig{
+			SessionEncryptionKey: getEnv("SESSION_ENCRYPTION_KEY", "dev-key-32-bytes-for-aes-256-gcm"),
+			CSRFSecretKey:        getEnv("CSRF_SECRET_KEY", "dev-csrf-secret-32-bytes-for-hmac"),
+			CookieDomain:         getEnv("COOKIE_DOMAIN", "localhost"),
+			CookieSecure:         getEnvAsBool("COOKIE_SECURE", false),
+			CookieSameSite:       getEnv("COOKIE_SAME_SITE", "Lax"),
 		},
 	}
 }
@@ -82,6 +104,15 @@ func getEnvAsInt(key string, defaultValue int) int {
 	if value := os.Getenv(key); value != "" {
 		if intValue, err := strconv.Atoi(value); err == nil {
 			return intValue
+		}
+	}
+	return defaultValue
+}
+
+func getEnvAsBool(key string, defaultValue bool) bool {
+	if value := os.Getenv(key); value != "" {
+		if boolValue, err := strconv.ParseBool(value); err == nil {
+			return boolValue
 		}
 	}
 	return defaultValue
