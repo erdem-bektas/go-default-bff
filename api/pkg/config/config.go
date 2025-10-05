@@ -36,6 +36,8 @@ type ZitadelConfig struct {
 	ClientSecret string
 	RedirectURL  string
 	Scopes       []string
+	Issuer       string
+	JWKSURL      string
 }
 
 func Load() *Config {
@@ -62,7 +64,9 @@ func Load() *Config {
 			ClientID:     getEnv("ZITADEL_CLIENT_ID", ""),
 			ClientSecret: getEnv("ZITADEL_CLIENT_SECRET", ""),
 			RedirectURL:  getEnv("ZITADEL_REDIRECT_URL", "http://localhost:3003/auth/callback"),
-			Scopes:       []string{"openid", "profile", "email", "urn:zitadel:iam:org:project:roles"},
+			Scopes:       []string{"openid", "profile", "email", "offline_access"},
+			Issuer:       getEnv("ZITADEL_ISSUER", "http://localhost:8080"),
+			JWKSURL:      getEnv("ZITADEL_JWKS_URL", ""),
 		},
 	}
 }

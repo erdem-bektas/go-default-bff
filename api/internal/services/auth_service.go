@@ -2,8 +2,6 @@ package services
 
 import (
 	"context"
-	"crypto/rand"
-	"encoding/base64"
 	"encoding/json"
 	"fiber-app/pkg/config"
 	"fmt"
@@ -11,15 +9,19 @@ import (
 	"strings"
 	"time"
 
-	"github.com/golang-jwt/jwt/v5"
 	"go.uber.org/zap"
 	"golang.org/x/oauth2"
 )
 
 type AuthService struct {
-	config      *config.ZitadelConfig
-	oauthConfig *oauth2.Config
-	logger      *zap.Logger
+	config         *config.ZitadelConfig
+	oauthConfig    *oauth2.Config
+	logger         *zap.Logger
+	oidcService    *OIDCDiscoveryService
+	jwksService    *JWKSService
+	pkceService    *PKCEService
+	sessionService *SessionService
+	oidcConfig     *OIDCConfiguration
 }
 
 type ZitadelUserInfo struct {
@@ -33,48 +35,138 @@ type ZitadelUserInfo struct {
 	Roles             []string `json:"urn:zitadel:iam:org:project:roles"`
 }
 
-type TokenClaims struct {
-	Sub   string   `json:"sub"`
-	Name  string   `json:"name"`
-	Email string   `json:"email"`
-	Roles []string `json:"urn:zitadel:iam:org:project:roles"`
-	jwt.RegisteredClaims
+type AuthURLResponse struct {
+	URL   string `json:"url"`
+	State string `json:"state"`
 }
 
 func NewAuthService(cfg *config.ZitadelConfig, logger *zap.Logger) *AuthService {
-	oauthConfig := &oauth2.Config{
-		ClientID:     cfg.ClientID,
-		ClientSecret: cfg.ClientSecret,
-		RedirectURL:  cfg.RedirectURL,
-		Scopes:       cfg.Scopes,
+	service := &AuthService{
+		config:         cfg,
+		logger:         logger,
+		oidcService:    NewOIDCDiscoveryService(logger),
+		pkceService:    NewPKCEService(logger),
+		sessionService: NewSessionService(logger),
+	}
+
+	// Initialize OIDC discovery
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	if err := service.initializeOIDC(ctx); err != nil {
+		logger.Error("Failed to initialize OIDC", zap.Error(err))
+		// Continue with manual configuration as fallback
+		service.setupFallbackConfig()
+	}
+
+	return service
+}
+
+func (as *AuthService) initializeOIDC(ctx context.Context) error {
+	// Discover OIDC configuration
+	oidcConfig, err := as.oidcService.DiscoverConfiguration(ctx, as.config.Issuer)
+	if err != nil {
+		return fmt.Errorf("OIDC discovery failed: %w", err)
+	}
+
+	as.oidcConfig = oidcConfig
+
+	// Setup OAuth2 config with discovered endpoints
+	as.oauthConfig = &oauth2.Config{
+		ClientID:     as.config.ClientID,
+		ClientSecret: as.config.ClientSecret,
+		RedirectURL:  as.config.RedirectURL,
+		Scopes:       as.config.Scopes,
 		Endpoint: oauth2.Endpoint{
-			AuthURL:  fmt.Sprintf("%s/oauth/v2/authorize", cfg.Domain),
-			TokenURL: fmt.Sprintf("%s/oauth/v2/token", cfg.Domain),
+			AuthURL:  oidcConfig.AuthorizationEndpoint,
+			TokenURL: oidcConfig.TokenEndpoint,
 		},
 	}
 
-	return &AuthService{
-		config:      cfg,
-		oauthConfig: oauthConfig,
-		logger:      logger,
+	// Initialize JWKS service
+	jwksURL := oidcConfig.JWKSUri
+	if as.config.JWKSURL != "" {
+		jwksURL = as.config.JWKSURL
 	}
+	as.jwksService = NewJWKSService(jwksURL, as.logger)
+
+	as.logger.Info("OIDC initialized successfully",
+		zap.String("issuer", oidcConfig.Issuer),
+		zap.String("auth_endpoint", oidcConfig.AuthorizationEndpoint),
+		zap.String("token_endpoint", oidcConfig.TokenEndpoint),
+		zap.String("jwks_uri", jwksURL),
+	)
+
+	return nil
 }
 
-// GenerateAuthURL - OAuth2 authorization URL oluştur
-func (as *AuthService) GenerateAuthURL() (string, string, error) {
-	// State parameter oluştur (CSRF koruması için)
-	state, err := generateRandomString(32)
+func (as *AuthService) setupFallbackConfig() {
+	// Fallback to manual configuration
+	as.oauthConfig = &oauth2.Config{
+		ClientID:     as.config.ClientID,
+		ClientSecret: as.config.ClientSecret,
+		RedirectURL:  as.config.RedirectURL,
+		Scopes:       as.config.Scopes,
+		Endpoint: oauth2.Endpoint{
+			AuthURL:  fmt.Sprintf("%s/oauth/v2/authorize", as.config.Domain),
+			TokenURL: fmt.Sprintf("%s/oauth/v2/token", as.config.Domain),
+		},
+	}
+
+	// Setup JWKS service with manual URL
+	jwksURL := as.config.JWKSURL
+	if jwksURL == "" {
+		jwksURL = fmt.Sprintf("%s/oauth/v2/keys", as.config.Domain)
+	}
+	as.jwksService = NewJWKSService(jwksURL, as.logger)
+
+	as.logger.Info("Using fallback OIDC configuration",
+		zap.String("auth_url", as.oauthConfig.Endpoint.AuthURL),
+		zap.String("token_url", as.oauthConfig.Endpoint.TokenURL),
+		zap.String("jwks_url", jwksURL),
+	)
+}
+
+// GenerateAuthURL - OAuth2 authorization URL with PKCE
+func (as *AuthService) GenerateAuthURL() (*AuthURLResponse, error) {
+	// Generate PKCE challenge
+	pkceChallenge, err := as.pkceService.GenerateChallenge()
 	if err != nil {
-		return "", "", err
+		return nil, fmt.Errorf("failed to generate PKCE challenge: %w", err)
 	}
 
-	url := as.oauthConfig.AuthCodeURL(state, oauth2.AccessTypeOffline)
-	return url, state, nil
+	// Build authorization URL with PKCE parameters
+	authURL := as.oauthConfig.AuthCodeURL(
+		pkceChallenge.State,
+		oauth2.AccessTypeOffline,
+		oauth2.SetAuthURLParam("code_challenge", pkceChallenge.CodeChallenge),
+		oauth2.SetAuthURLParam("code_challenge_method", "S256"),
+	)
+
+	as.logger.Info("Generated OAuth2 authorization URL",
+		zap.String("state", pkceChallenge.State),
+	)
+
+	return &AuthURLResponse{
+		URL:   authURL,
+		State: pkceChallenge.State,
+	}, nil
 }
 
-// ExchangeCodeForToken - Authorization code'u token ile değiştir
-func (as *AuthService) ExchangeCodeForToken(ctx context.Context, code string) (*oauth2.Token, error) {
-	token, err := as.oauthConfig.Exchange(ctx, code)
+// ExchangeCodeForToken - Authorization code'u token ile değiştir (PKCE)
+func (as *AuthService) ExchangeCodeForToken(ctx context.Context, code, state string) (*oauth2.Token, error) {
+	// Validate PKCE challenge
+	pkceChallenge, err := as.pkceService.ValidateAndGetChallenge(state)
+	if err != nil {
+		return nil, fmt.Errorf("PKCE validation failed: %w", err)
+	}
+
+	// Exchange code for token with PKCE verifier
+	token, err := as.oauthConfig.Exchange(
+		ctx,
+		code,
+		oauth2.SetAuthURLParam("code_verifier", pkceChallenge.CodeVerifier),
+	)
 	if err != nil {
 		as.logger.Error("Token exchange failed", zap.Error(err))
 		return nil, err
@@ -122,24 +214,18 @@ func (as *AuthService) GetUserInfo(ctx context.Context, token *oauth2.Token) (*Z
 	return &userInfo, nil
 }
 
-// ValidateToken - JWT token'ı validate et
-func (as *AuthService) ValidateToken(tokenString string) (*TokenClaims, error) {
-	// Zitadel'den public key alınması gerekir, şimdilik basit validation
-	token, err := jwt.ParseWithClaims(tokenString, &TokenClaims{}, func(token *jwt.Token) (interface{}, error) {
-		// Bu gerçek implementasyonda Zitadel'in public key'i kullanılmalı
-		return []byte("your-secret-key"), nil
-	})
+// ValidateToken - JWT token'ı JWKS ile validate et
+func (as *AuthService) ValidateToken(ctx context.Context, tokenString string) (*TokenClaims, error) {
+	if as.jwksService == nil {
+		return nil, fmt.Errorf("JWKS service not initialized")
+	}
 
+	claims, err := as.jwksService.ValidateToken(ctx, tokenString)
 	if err != nil {
-		as.logger.Error("Token validation failed", zap.Error(err))
-		return nil, err
+		return nil, fmt.Errorf("token validation failed: %w", err)
 	}
 
-	if claims, ok := token.Claims.(*TokenClaims); ok && token.Valid {
-		return claims, nil
-	}
-
-	return nil, fmt.Errorf("invalid token")
+	return claims, nil
 }
 
 // HasRole - Kullanıcının belirli bir role'ü var mı kontrol et
@@ -164,30 +250,24 @@ func (as *AuthService) HasAnyRole(userInfo *ZitadelUserInfo, requiredRoles []str
 	return false
 }
 
-// CreateJWTToken - Kullanıcı için JWT token oluştur
-func (as *AuthService) CreateJWTToken(userInfo *ZitadelUserInfo) (string, error) {
-	claims := TokenClaims{
-		Sub:   userInfo.Sub,
-		Name:  userInfo.Name,
-		Email: userInfo.Email,
-		Roles: userInfo.Roles,
-		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(24 * time.Hour)),
-			IssuedAt:  jwt.NewNumericDate(time.Now()),
-			NotBefore: jwt.NewNumericDate(time.Now()),
-			Issuer:    "fiber-app",
-			Subject:   userInfo.Sub,
-		},
-	}
+// CreateSession - Kullanıcı için session oluştur
+func (as *AuthService) CreateSession(userInfo *ZitadelUserInfo) (*Session, error) {
+	return as.sessionService.CreateSession(userInfo)
+}
 
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	tokenString, err := token.SignedString([]byte("your-secret-key"))
-	if err != nil {
-		as.logger.Error("Failed to create JWT token", zap.Error(err))
-		return "", err
-	}
+// GetSession - Session'ı getir
+func (as *AuthService) GetSession(sessionID string) (*Session, error) {
+	return as.sessionService.GetSession(sessionID)
+}
 
-	return tokenString, nil
+// DeleteSession - Session'ı sil
+func (as *AuthService) DeleteSession(sessionID string) error {
+	return as.sessionService.DeleteSession(sessionID)
+}
+
+// ValidateSession - Session'ı validate et
+func (as *AuthService) ValidateSession(sessionID string) (*Session, error) {
+	return as.sessionService.ValidateSession(sessionID)
 }
 
 // RevokeToken - Token'ı iptal et
@@ -219,13 +299,4 @@ func (as *AuthService) RevokeToken(ctx context.Context, token *oauth2.Token) err
 
 	as.logger.Info("Token revoked successfully")
 	return nil
-}
-
-// generateRandomString - Güvenli random string oluştur
-func generateRandomString(length int) (string, error) {
-	bytes := make([]byte, length)
-	if _, err := rand.Read(bytes); err != nil {
-		return "", err
-	}
-	return base64.URLEncoding.EncodeToString(bytes)[:length], nil
 }

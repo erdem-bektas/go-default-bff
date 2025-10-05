@@ -53,15 +53,17 @@ func main() {
 		log.Fatal("Database bağlantısı başarısız:", err)
 	}
 
-	// Database migration
+	// Database migration (development only)
 	if err := database.Migrate(); err != nil {
-		zapLogger.Fatal("Database migration başarısız", zap.Error(err))
+		zapLogger.Warn("Database auto-migration failed (expected in production)", zap.Error(err))
 	}
 
-	// Default rolleri oluştur
-	if err := database.SeedDefaultRoles(); err != nil {
-		zapLogger.Fatal("Default roles oluşturulamadı", zap.Error(err))
-	}
+	// Initialize migration runner
+	migrationRunner := database.InitializeMigrationRunner(zapLogger)
+
+	// Initialize health service
+	healthService := services.NewHealthService(database.DB, migrationRunner, zapLogger)
+	handlers.SetHealthService(healthService)
 
 	// Redis bağlantısı
 	if err := cache.Connect(cfg, zapLogger); err != nil {

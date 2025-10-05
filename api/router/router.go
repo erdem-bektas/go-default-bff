@@ -18,8 +18,11 @@ func SetupRoutes(app *fiber.App) {
 	// Health routes
 	health := api.Group("/health")
 	health.Get("/", handlers.HealthCheck)
-	health.Get("/ready", handlers.ReadinessCheck)
-	health.Get("/live", handlers.LivenessCheck)
+	health.Get("/detailed", handlers.DetailedHealthCheck)
+
+	// Production health endpoints (Kubernetes style)
+	app.Get("/healthz", handlers.LivenessCheck)
+	app.Get("/readyz", handlers.ReadinessCheck)
 
 	// Metrics routes
 	metrics := api.Group("/metrics")
@@ -35,17 +38,12 @@ func SetupRoutes(app *fiber.App) {
 	users := api.Group("/users")
 	users.Get("/", handlers.GetUsers)
 	users.Get("/:id", handlers.GetUser)
+	users.Get("/zitadel/:zitadel_id", handlers.GetUserByZitadelID)
 	users.Post("/", handlers.CreateUser)
 	users.Put("/:id", handlers.UpdateUser)
 	users.Delete("/:id", handlers.DeleteUser)
-
-	// Role routes
-	roles := api.Group("/roles")
-	roles.Get("/", handlers.GetRoles)
-	roles.Get("/:id", handlers.GetRole)
-	roles.Post("/", handlers.CreateRole)
-	roles.Put("/:id", handlers.UpdateRole)
-	roles.Delete("/:id", handlers.DeleteRole)
+	users.Post("/roles", handlers.AssignUserRole)
+	users.Delete("/roles/:id", handlers.RemoveUserRole)
 
 	// Cache routes
 	cache := api.Group("/cache")

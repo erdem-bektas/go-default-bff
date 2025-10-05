@@ -6,15 +6,14 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/google/uuid"
 	"go.uber.org/zap"
 )
 
 const (
 	// Cache key prefixes
-	UserCachePrefix = "user:"
-	RoleCachePrefix = "role:"
-	UserRolePrefix  = "user_role:"
+	UserCachePrefix   = "user:"
+	UserRolePrefix    = "user_roles:"
+	ZitadelUserPrefix = "zitadel_user:"
 
 	// Cache TTL
 	DefaultCacheTTL = 15 * time.Minute
@@ -33,219 +32,242 @@ func NewCacheService(logger *zap.Logger) *CacheService {
 
 // User Cache Operations
 
-// GetUser - Cache'den user getir
-func (cs *CacheService) GetUser(userID uuid.UUID) (*models.User, error) {
-	key := fmt.Sprintf("%s%s", UserCachePrefix, userID.String())
+// GetUser - Get user from cache by ID
+func (cs *CacheService) GetUser(userID uint) (*models.User, error) {
+	key := fmt.Sprintf("%s%d", UserCachePrefix, userID)
 
 	var user models.User
 	err := cache.Get(key, &user)
 	if err != nil {
 		cs.logger.Debug("User cache miss",
-			zap.String("user_id", userID.String()),
+			zap.Uint("user_id", userID),
 			zap.Error(err),
 		)
 		return nil, err
 	}
 
 	cs.logger.Debug("User cache hit",
-		zap.String("user_id", userID.String()),
+		zap.Uint("user_id", userID),
 	)
 
 	return &user, nil
 }
 
-// SetUser - User'ı cache'e kaydet
-func (cs *CacheService) SetUser(user *models.User) error {
-	key := fmt.Sprintf("%s%s", UserCachePrefix, user.ID.String())
+// GetUserByZitadelID - Get user from cache by Zitadel ID
+func (cs *CacheService) GetUserByZitadelID(zitadelID string) (*models.User, error) {
+	key := fmt.Sprintf("%s%s", ZitadelUserPrefix, zitadelID)
 
+	var user models.User
+	err := cache.Get(key, &user)
+	if err != nil {
+		cs.logger.Debug("Zitadel user cache miss",
+			zap.String("zitadel_id", zitadelID),
+			zap.Error(err),
+		)
+		return nil, err
+	}
+
+	cs.logger.Debug("Zitadel user cache hit",
+		zap.String("zitadel_id", zitadelID),
+	)
+
+	return &user, nil
+}
+
+// SetUser - Save user to cache
+func (cs *CacheService) SetUser(user *models.User) error {
+	// Cache by ID
+	key := fmt.Sprintf("%s%d", UserCachePrefix, user.ID)
 	err := cache.Set(key, user, DefaultCacheTTL)
 	if err != nil {
 		cs.logger.Error("User cache set failed",
-			zap.String("user_id", user.ID.String()),
+			zap.Uint("user_id", user.ID),
+			zap.Error(err),
+		)
+		return err
+	}
+
+	// Cache by Zitadel ID
+	zitadelKey := fmt.Sprintf("%s%s", ZitadelUserPrefix, user.ZitadelID)
+	err = cache.Set(zitadelKey, user, DefaultCacheTTL)
+	if err != nil {
+		cs.logger.Error("Zitadel user cache set failed",
+			zap.String("zitadel_id", user.ZitadelID),
 			zap.Error(err),
 		)
 		return err
 	}
 
 	cs.logger.Debug("User cached",
-		zap.String("user_id", user.ID.String()),
+		zap.Uint("user_id", user.ID),
+		zap.String("zitadel_id", user.ZitadelID),
 	)
 
 	return nil
 }
 
-// DeleteUser - User cache'ini sil
-func (cs *CacheService) DeleteUser(userID uuid.UUID) error {
-	key := fmt.Sprintf("%s%s", UserCachePrefix, userID.String())
+// DeleteUser - Delete user cache
+func (cs *CacheService) DeleteUser(userID uint) error {
+	key := fmt.Sprintf("%s%d", UserCachePrefix, userID)
 
 	err := cache.Delete(key)
 	if err != nil {
 		cs.logger.Error("User cache delete failed",
-			zap.String("user_id", userID.String()),
+			zap.Uint("user_id", userID),
 			zap.Error(err),
 		)
 		return err
 	}
 
 	cs.logger.Debug("User cache deleted",
-		zap.String("user_id", userID.String()),
+		zap.Uint("user_id", userID),
 	)
 
 	return nil
 }
 
-// Role Cache Operations
-
-// GetRole - Cache'den role getir
-func (cs *CacheService) GetRole(roleID uuid.UUID) (*models.Role, error) {
-	key := fmt.Sprintf("%s%s", RoleCachePrefix, roleID.String())
-
-	var role models.Role
-	err := cache.Get(key, &role)
-	if err != nil {
-		cs.logger.Debug("Role cache miss",
-			zap.String("role_id", roleID.String()),
-			zap.Error(err),
-		)
-		return nil, err
-	}
-
-	cs.logger.Debug("Role cache hit",
-		zap.String("role_id", roleID.String()),
-	)
-
-	return &role, nil
-}
-
-// SetRole - Role'ü cache'e kaydet
-func (cs *CacheService) SetRole(role *models.Role) error {
-	key := fmt.Sprintf("%s%s", RoleCachePrefix, role.ID.String())
-
-	err := cache.Set(key, role, RoleCacheTTL)
-	if err != nil {
-		cs.logger.Error("Role cache set failed",
-			zap.String("role_id", role.ID.String()),
-			zap.Error(err),
-		)
-		return err
-	}
-
-	cs.logger.Debug("Role cached",
-		zap.String("role_id", role.ID.String()),
-	)
-
-	return nil
-}
-
-// DeleteRole - Role cache'ini sil
-func (cs *CacheService) DeleteRole(roleID uuid.UUID) error {
-	key := fmt.Sprintf("%s%s", RoleCachePrefix, roleID.String())
+// DeleteUserByZitadelID - Delete user cache by Zitadel ID
+func (cs *CacheService) DeleteUserByZitadelID(zitadelID string) error {
+	key := fmt.Sprintf("%s%s", ZitadelUserPrefix, zitadelID)
 
 	err := cache.Delete(key)
 	if err != nil {
-		cs.logger.Error("Role cache delete failed",
-			zap.String("role_id", roleID.String()),
+		cs.logger.Error("Zitadel user cache delete failed",
+			zap.String("zitadel_id", zitadelID),
 			zap.Error(err),
 		)
 		return err
 	}
 
-	cs.logger.Debug("Role cache deleted",
-		zap.String("role_id", roleID.String()),
+	cs.logger.Debug("Zitadel user cache deleted",
+		zap.String("zitadel_id", zitadelID),
 	)
 
 	return nil
 }
 
-// GetAllRoles - Tüm rolleri cache'den getir
-func (cs *CacheService) GetAllRoles() ([]models.Role, error) {
-	key := "all_roles"
+// User Role Cache Operations
 
-	var roles []models.Role
+// GetUserRoles - Get user roles from cache
+func (cs *CacheService) GetUserRoles(userID uint) ([]models.UserRole, error) {
+	key := fmt.Sprintf("%s%d", UserRolePrefix, userID)
+
+	var roles []models.UserRole
 	err := cache.Get(key, &roles)
 	if err != nil {
-		cs.logger.Debug("All roles cache miss", zap.Error(err))
+		cs.logger.Debug("User roles cache miss",
+			zap.Uint("user_id", userID),
+			zap.Error(err),
+		)
 		return nil, err
 	}
 
-	cs.logger.Debug("All roles cache hit")
+	cs.logger.Debug("User roles cache hit",
+		zap.Uint("user_id", userID),
+	)
+
 	return roles, nil
 }
 
-// SetAllRoles - Tüm rolleri cache'e kaydet
-func (cs *CacheService) SetAllRoles(roles []models.Role) error {
-	key := "all_roles"
+// SetUserRoles - Save user roles to cache
+func (cs *CacheService) SetUserRoles(userID uint, roles []models.UserRole) error {
+	key := fmt.Sprintf("%s%d", UserRolePrefix, userID)
 
 	err := cache.Set(key, roles, RoleCacheTTL)
 	if err != nil {
-		cs.logger.Error("All roles cache set failed", zap.Error(err))
+		cs.logger.Error("User roles cache set failed",
+			zap.Uint("user_id", userID),
+			zap.Error(err),
+		)
 		return err
 	}
 
-	cs.logger.Debug("All roles cached")
+	cs.logger.Debug("User roles cached",
+		zap.Uint("user_id", userID),
+		zap.Int("role_count", len(roles)),
+	)
+
 	return nil
 }
 
-// User-Role Relationship Cache
+// DeleteUserRoles - Delete user roles cache
+func (cs *CacheService) DeleteUserRoles(userID uint) error {
+	key := fmt.Sprintf("%s%d", UserRolePrefix, userID)
 
-// GetUserRole - User'ın role bilgisini cache'den getir
-func (cs *CacheService) GetUserRole(userID uuid.UUID) (*models.Role, error) {
-	key := fmt.Sprintf("%s%s", UserRolePrefix, userID.String())
-
-	var role models.Role
-	err := cache.Get(key, &role)
+	err := cache.Delete(key)
 	if err != nil {
-		cs.logger.Debug("User role cache miss",
-			zap.String("user_id", userID.String()),
+		cs.logger.Error("User roles cache delete failed",
+			zap.Uint("user_id", userID),
+			zap.Error(err),
+		)
+		return err
+	}
+
+	cs.logger.Debug("User roles cache deleted",
+		zap.Uint("user_id", userID),
+	)
+
+	return nil
+}
+
+// Session Cache Operations (for future use with Zitadel sessions)
+
+// GetSession - Get session from cache
+func (cs *CacheService) GetSession(sessionID string) (map[string]interface{}, error) {
+	key := fmt.Sprintf("session:%s", sessionID)
+
+	var session map[string]interface{}
+	err := cache.Get(key, &session)
+	if err != nil {
+		cs.logger.Debug("Session cache miss",
+			zap.String("session_id", sessionID),
 			zap.Error(err),
 		)
 		return nil, err
 	}
 
-	cs.logger.Debug("User role cache hit",
-		zap.String("user_id", userID.String()),
-		zap.String("role", role.Name),
+	cs.logger.Debug("Session cache hit",
+		zap.String("session_id", sessionID),
 	)
 
-	return &role, nil
+	return session, nil
 }
 
-// SetUserRole - User'ın role bilgisini cache'e kaydet
-func (cs *CacheService) SetUserRole(userID uuid.UUID, role *models.Role) error {
-	key := fmt.Sprintf("%s%s", UserRolePrefix, userID.String())
+// SetSession - Save session to cache
+func (cs *CacheService) SetSession(sessionID string, session map[string]interface{}, ttl time.Duration) error {
+	key := fmt.Sprintf("session:%s", sessionID)
 
-	err := cache.Set(key, role, DefaultCacheTTL)
+	err := cache.Set(key, session, ttl)
 	if err != nil {
-		cs.logger.Error("User role cache set failed",
-			zap.String("user_id", userID.String()),
+		cs.logger.Error("Session cache set failed",
+			zap.String("session_id", sessionID),
 			zap.Error(err),
 		)
 		return err
 	}
 
-	cs.logger.Debug("User role cached",
-		zap.String("user_id", userID.String()),
-		zap.String("role", role.Name),
+	cs.logger.Debug("Session cached",
+		zap.String("session_id", sessionID),
 	)
 
 	return nil
 }
 
-// DeleteUserRole - User'ın role cache'ini sil
-func (cs *CacheService) DeleteUserRole(userID uuid.UUID) error {
-	key := fmt.Sprintf("%s%s", UserRolePrefix, userID.String())
+// DeleteSession - Delete session cache
+func (cs *CacheService) DeleteSession(sessionID string) error {
+	key := fmt.Sprintf("session:%s", sessionID)
 
 	err := cache.Delete(key)
 	if err != nil {
-		cs.logger.Error("User role cache delete failed",
-			zap.String("user_id", userID.String()),
+		cs.logger.Error("Session cache delete failed",
+			zap.String("session_id", sessionID),
 			zap.Error(err),
 		)
 		return err
 	}
 
-	cs.logger.Debug("User role cache deleted",
-		zap.String("user_id", userID.String()),
+	cs.logger.Debug("Session cache deleted",
+		zap.String("session_id", sessionID),
 	)
 
 	return nil
@@ -253,51 +275,47 @@ func (cs *CacheService) DeleteUserRole(userID uuid.UUID) error {
 
 // Cache Management
 
-// InvalidateUserCaches - User ile ilgili tüm cache'leri sil
-func (cs *CacheService) InvalidateUserCaches(userID uuid.UUID) error {
-	// User cache'ini sil
+// InvalidateUserCaches - Invalidate all user-related caches
+func (cs *CacheService) InvalidateUserCaches(userID uint, zitadelID string) error {
+	// Delete user cache by ID
 	if err := cs.DeleteUser(userID); err != nil {
 		cs.logger.Error("Failed to delete user cache", zap.Error(err))
 	}
 
-	// User role cache'ini sil
-	if err := cs.DeleteUserRole(userID); err != nil {
-		cs.logger.Error("Failed to delete user role cache", zap.Error(err))
+	// Delete user cache by Zitadel ID
+	if zitadelID != "" {
+		if err := cs.DeleteUserByZitadelID(zitadelID); err != nil {
+			cs.logger.Error("Failed to delete zitadel user cache", zap.Error(err))
+		}
+	}
+
+	// Delete user roles cache
+	if err := cs.DeleteUserRoles(userID); err != nil {
+		cs.logger.Error("Failed to delete user roles cache", zap.Error(err))
 	}
 
 	cs.logger.Info("User caches invalidated",
-		zap.String("user_id", userID.String()),
+		zap.Uint("user_id", userID),
+		zap.String("zitadel_id", zitadelID),
 	)
 
 	return nil
 }
 
-// InvalidateRoleCaches - Role ile ilgili tüm cache'leri sil
-func (cs *CacheService) InvalidateRoleCaches(roleID uuid.UUID) error {
-	// Role cache'ini sil
-	if err := cs.DeleteRole(roleID); err != nil {
-		cs.logger.Error("Failed to delete role cache", zap.Error(err))
-	}
-
-	// All roles cache'ini sil
-	if err := cache.Delete("all_roles"); err != nil {
-		cs.logger.Error("Failed to delete all roles cache", zap.Error(err))
-	}
-
-	// Bu role'ü kullanan user'ların role cache'lerini sil
+// InvalidateAllUserRoleCaches - Invalidate all user role caches (when roles change globally)
+func (cs *CacheService) InvalidateAllUserRoleCaches() error {
+	// Delete all user role caches
 	pattern := fmt.Sprintf("%s*", UserRolePrefix)
 	if err := cache.DeletePattern(pattern); err != nil {
 		cs.logger.Error("Failed to delete user role caches", zap.Error(err))
+		return err
 	}
 
-	cs.logger.Info("Role caches invalidated",
-		zap.String("role_id", roleID.String()),
-	)
-
+	cs.logger.Info("All user role caches invalidated")
 	return nil
 }
 
-// GetCacheStats - Cache istatistikleri
+// GetCacheStats - Get cache statistics
 func (cs *CacheService) GetCacheStats() (map[string]interface{}, error) {
 	dbSize, err := cache.DBSize()
 	if err != nil {
@@ -305,14 +323,16 @@ func (cs *CacheService) GetCacheStats() (map[string]interface{}, error) {
 	}
 
 	userKeys, _ := cache.Keys(UserCachePrefix + "*")
-	roleKeys, _ := cache.Keys(RoleCachePrefix + "*")
+	zitadelUserKeys, _ := cache.Keys(ZitadelUserPrefix + "*")
 	userRoleKeys, _ := cache.Keys(UserRolePrefix + "*")
+	sessionKeys, _ := cache.Keys("session:*")
 
 	stats := map[string]interface{}{
-		"total_keys":     dbSize,
-		"user_keys":      len(userKeys),
-		"role_keys":      len(roleKeys),
-		"user_role_keys": len(userRoleKeys),
+		"total_keys":        dbSize,
+		"user_keys":         len(userKeys),
+		"zitadel_user_keys": len(zitadelUserKeys),
+		"user_role_keys":    len(userRoleKeys),
+		"session_keys":      len(sessionKeys),
 	}
 
 	return stats, nil

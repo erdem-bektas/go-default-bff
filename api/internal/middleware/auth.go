@@ -52,7 +52,7 @@ func (am *AuthMiddleware) RequireAuth() fiber.Handler {
 		token := tokenParts[1]
 
 		// Token'ı validate et
-		claims, err := am.authService.ValidateToken(token)
+		claims, err := am.authService.ValidateToken(c.Context(), token)
 		if err != nil {
 			am.logger.Warn("Token validation failed",
 				zap.String("trace_id", traceID),
@@ -206,7 +206,7 @@ func (am *AuthMiddleware) OptionalAuth() fiber.Handler {
 		}
 
 		token := tokenParts[1]
-		claims, err := am.authService.ValidateToken(token)
+		claims, err := am.authService.ValidateToken(c.Context(), token)
 		if err != nil {
 			return c.Next()
 		}

@@ -4,6 +4,7 @@ import (
 	"fiber-app/internal/models"
 	"fiber-app/pkg/config"
 	"fmt"
+	"os"
 
 	"go.uber.org/zap"
 	"gorm.io/driver/postgres"
@@ -23,7 +24,7 @@ func Connect(cfg *config.Config, zapLogger *zap.Logger) error {
 		cfg.Database.SSLMode,
 	)
 
-	zapLogger.Info("Database bağlantısı kuruluyor",
+	zapLogger.Info("Database connection establishing",
 		zap.String("host", cfg.Database.Host),
 		zap.String("port", cfg.Database.Port),
 		zap.String("dbname", cfg.Database.DBName),
@@ -31,44 +32,39 @@ func Connect(cfg *config.Config, zapLogger *zap.Logger) error {
 
 	var err error
 	DB, err = gorm.Open(postgres.Open(dsn), &gorm.Config{
-		Logger: logger.Default.LogMode(logger.Silent), // GORM loglarını kapat
+		Logger: logger.Default.LogMode(logger.Silent), // Disable GORM logs
 	})
 
 	if err != nil {
-		zapLogger.Error("Database bağlantısı başarısız", zap.Error(err))
+		zapLogger.Error("Database connection failed", zap.Error(err))
 		return err
 	}
 
-	zapLogger.Info("Database bağlantısı başarılı")
+	// Configure connection pool
+	if err := ConfigureConnectionPool(DB); err != nil {
+		zapLogger.Error("Failed to configure connection pool", zap.Error(err))
+		return err
+	}
+
+	zapLogger.Info("Database connection successful")
 	return nil
 }
 
+// Migrate runs auto-migration for development only
+// In production, use MigrationRunner instead
 func Migrate() error {
+	// Check if we're in production mode
+	if os.Getenv("APP_ENV") == "production" {
+		return fmt.Errorf("auto-migration is disabled in production, use migration runner instead")
+	}
+
 	return DB.AutoMigrate(
-		&models.Role{},
 		&models.User{},
+		&models.UserRole{},
 	)
 }
 
-func SeedDefaultRoles() error {
-	roles := []models.Role{
-		{Name: "admin", Description: "System administrator with full access"},
-		{Name: "user", Description: "Regular user with limited access"},
-		{Name: "moderator", Description: "Moderator with content management access"},
-	}
-
-	for _, role := range roles {
-		var existingRole models.Role
-		if err := DB.Where("name = ?", role.Name).First(&existingRole).Error; err != nil {
-			if err == gorm.ErrRecordNotFound {
-				if err := DB.Create(&role).Error; err != nil {
-					return err
-				}
-			} else {
-				return err
-			}
-		}
-	}
-
-	return nil
+// InitializeMigrationRunner creates and returns a migration runner instance
+func InitializeMigrationRunner(zapLogger *zap.Logger) MigrationRunner {
+	return NewMigrationRunner(DB, zapLogger)
 }

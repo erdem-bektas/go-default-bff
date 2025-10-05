@@ -3,8 +3,6 @@ package handlers
 import (
 	"context"
 	"fiber-app/internal/services"
-	"fiber-app/pkg/cache"
-	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"go.uber.org/zap"
@@ -19,7 +17,7 @@ func SetAuthService(as *services.AuthService) {
 
 // Login - OAuth2 login başlat
 // @Summary OAuth2 Login
-// @Description Zitadel OAuth2 login işlemini başlatır
+// @Description Zitadel OAuth2 login işlemini başlatır (PKCE)
 // @Tags Auth
 // @Accept json
 // @Produce json
@@ -39,8 +37,8 @@ func Login(c *fiber.Ctx) error {
 		})
 	}
 
-	// OAuth2 authorization URL oluştur
-	authURL, state, err := authService.GenerateAuthURL()
+	// OAuth2 authorization URL oluştur (PKCE ile)
+	authResponse, err := authService.GenerateAuthURL()
 	if err != nil {
 		zapLogger.Error("Auth URL oluşturulamadı",
 			zap.String("trace_id", traceID),
@@ -52,22 +50,14 @@ func Login(c *fiber.Ctx) error {
 		})
 	}
 
-	// State'i cache'e kaydet (CSRF koruması için)
-	if err := cache.Set("auth_state:"+state, traceID, 10*time.Minute); err != nil {
-		zapLogger.Warn("State cache'e kaydedilemedi",
-			zap.String("trace_id", traceID),
-			zap.Error(err),
-		)
-	}
-
 	zapLogger.Info("Auth URL oluşturuldu",
 		zap.String("trace_id", traceID),
-		zap.String("state", state),
+		zap.String("state", authResponse.State),
 	)
 
 	return c.JSON(fiber.Map{
-		"auth_url": authURL,
-		"state":    state,
+		"auth_url": authResponse.URL,
+		"state":    authResponse.State,
 		"message":  "Bu URL'ye yönlendirilerek giriş yapabilirsiniz",
 		"trace_id": traceID,
 	})
@@ -75,7 +65,7 @@ func Login(c *fiber.Ctx) error {
 
 // LoginRedirect - OAuth2 login'e yönlendir
 // @Summary OAuth2 Login Redirect
-// @Description Zitadel OAuth2 login sayfasına yönlendirir
+// @Description Zitadel OAuth2 login sayfasına yönlendirir (PKCE)
 // @Tags Auth
 // @Accept json
 // @Produce json
@@ -90,7 +80,7 @@ func LoginRedirect(c *fiber.Ctx) error {
 		})
 	}
 
-	authURL, state, err := authService.GenerateAuthURL()
+	authResponse, err := authService.GenerateAuthURL()
 	if err != nil {
 		zapLogger.Error("Auth URL oluşturulamadı",
 			zap.String("trace_id", traceID),
@@ -102,20 +92,12 @@ func LoginRedirect(c *fiber.Ctx) error {
 		})
 	}
 
-	// State'i cache'e kaydet
-	if err := cache.Set("auth_state:"+state, traceID, 10*time.Minute); err != nil {
-		zapLogger.Warn("State cache'e kaydedilemedi",
-			zap.String("trace_id", traceID),
-			zap.Error(err),
-		)
-	}
-
-	return c.Redirect(authURL)
+	return c.Redirect(authResponse.URL)
 }
 
 // Callback - OAuth2 callback
 // @Summary OAuth2 Callback
-// @Description OAuth2 callback endpoint'i
+// @Description OAuth2 callback endpoint'i (PKCE)
 // @Tags Auth
 // @Accept json
 // @Produce json
@@ -151,23 +133,6 @@ func Callback(c *fiber.Ctx) error {
 		})
 	}
 
-	// State'i validate et (CSRF koruması)
-	var cachedTraceID string
-	if err := cache.Get("auth_state:"+state, &cachedTraceID); err != nil {
-		zapLogger.Warn("State validation başarısız",
-			zap.String("trace_id", traceID),
-			zap.String("state", state),
-			zap.Error(err),
-		)
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error":    "Geçersiz state parameter",
-			"trace_id": traceID,
-		})
-	}
-
-	// State'i cache'den sil
-	cache.Delete("auth_state:" + state)
-
 	if authService == nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error":    "Auth service yapılandırılmamış",
@@ -177,8 +142,8 @@ func Callback(c *fiber.Ctx) error {
 
 	ctx := context.Background()
 
-	// Authorization code'u token ile değiştir
-	token, err := authService.ExchangeCodeForToken(ctx, code)
+	// Authorization code'u token ile değiştir (PKCE validation dahil)
+	token, err := authService.ExchangeCodeForToken(ctx, code, state)
 	if err != nil {
 		zapLogger.Error("Token exchange başarısız",
 			zap.String("trace_id", traceID),
@@ -203,47 +168,42 @@ func Callback(c *fiber.Ctx) error {
 		})
 	}
 
-	// JWT token oluştur
-	jwtToken, err := authService.CreateJWTToken(userInfo)
+	// Session oluştur
+	session, err := authService.CreateSession(userInfo)
 	if err != nil {
-		zapLogger.Error("JWT token oluşturulamadı",
+		zapLogger.Error("Session oluşturulamadı",
 			zap.String("trace_id", traceID),
 			zap.Error(err),
 		)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error":    "JWT token oluşturulamadı",
+			"error":    "Session oluşturulamadı",
 			"trace_id": traceID,
 		})
 	}
 
-	// User session'ını cache'e kaydet
-	sessionKey := "session:" + userInfo.Sub
-	sessionData := map[string]interface{}{
-		"user_id":    userInfo.Sub,
-		"name":       userInfo.Name,
-		"email":      userInfo.Email,
-		"roles":      userInfo.Roles,
-		"login_time": time.Now(),
-	}
-
-	if err := cache.Set(sessionKey, sessionData, 24*time.Hour); err != nil {
-		zapLogger.Warn("Session cache'e kaydedilemedi",
-			zap.String("trace_id", traceID),
-			zap.Error(err),
-		)
-	}
+	// HttpOnly cookie set et
+	c.Cookie(&fiber.Cookie{
+		Name:     "session_id",
+		Value:    session.ID,
+		Path:     "/",
+		MaxAge:   24 * 60 * 60, // 24 hours
+		Secure:   false,        // M0: HTTP için false, production'da true olmalı
+		HTTPOnly: true,
+		SameSite: "Lax",
+	})
 
 	zapLogger.Info("User başarıyla giriş yaptı",
 		zap.String("trace_id", traceID),
 		zap.String("user_id", userInfo.Sub),
 		zap.String("email", userInfo.Email),
 		zap.Strings("roles", userInfo.Roles),
+		zap.String("session_id", session.ID),
 	)
 
 	return c.JSON(fiber.Map{
 		"message":    "Giriş başarılı",
-		"token":      jwtToken,
 		"user_info":  userInfo,
+		"session_id": session.ID,
 		"expires_in": 24 * 60 * 60, // 24 saat (saniye)
 		"trace_id":   traceID,
 	})
@@ -255,16 +215,15 @@ func Callback(c *fiber.Ctx) error {
 // @Tags Auth
 // @Accept json
 // @Produce json
-// @Security BearerAuth
 // @Success 200 {object} map[string]interface{}
 // @Failure 401 {object} map[string]interface{}
 // @Router /auth/logout [post]
 func Logout(c *fiber.Ctx) error {
 	traceID := getTraceID(c)
 
-	// User ID'yi context'ten al
-	userID, ok := c.Locals("user_id").(string)
-	if !ok {
+	// Session ID'yi cookie'den al
+	sessionID := c.Cookies("session_id")
+	if sessionID == "" {
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
 			"error":    "Geçersiz oturum",
 			"trace_id": traceID,
@@ -273,22 +232,37 @@ func Logout(c *fiber.Ctx) error {
 
 	zapLogger.Info("Logout endpoint çağrıldı",
 		zap.String("trace_id", traceID),
-		zap.String("user_id", userID),
+		zap.String("session_id", sessionID),
 	)
 
-	// Session'ı cache'den sil
-	sessionKey := "session:" + userID
-	if err := cache.Delete(sessionKey); err != nil {
-		zapLogger.Warn("Session cache'den silinemedi",
+	if authService == nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error":    "Auth service yapılandırılmamış",
+			"trace_id": traceID,
+		})
+	}
+
+	// Session'ı sil
+	if err := authService.DeleteSession(sessionID); err != nil {
+		zapLogger.Warn("Session silinemedi",
 			zap.String("trace_id", traceID),
-			zap.String("user_id", userID),
+			zap.String("session_id", sessionID),
 			zap.Error(err),
 		)
 	}
 
+	// Cookie'yi temizle
+	c.Cookie(&fiber.Cookie{
+		Name:     "session_id",
+		Value:    "",
+		Path:     "/",
+		MaxAge:   -1,
+		HTTPOnly: true,
+	})
+
 	zapLogger.Info("User başarıyla çıkış yaptı",
 		zap.String("trace_id", traceID),
-		zap.String("user_id", userID),
+		zap.String("session_id", sessionID),
 	)
 
 	return c.JSON(fiber.Map{
@@ -303,42 +277,56 @@ func Logout(c *fiber.Ctx) error {
 // @Tags Auth
 // @Accept json
 // @Produce json
-// @Security BearerAuth
 // @Success 200 {object} map[string]interface{}
 // @Failure 401 {object} map[string]interface{}
 // @Router /auth/profile [get]
 func Profile(c *fiber.Ctx) error {
 	traceID := getTraceID(c)
 
-	// User bilgilerini context'ten al
-	userID, _ := c.Locals("user_id").(string)
-	userName, _ := c.Locals("user_name").(string)
-	userEmail, _ := c.Locals("user_email").(string)
-	userRoles, _ := c.Locals("user_roles").([]string)
+	// Session ID'yi cookie'den al
+	sessionID := c.Cookies("session_id")
+	if sessionID == "" {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"error":    "Geçersiz oturum",
+			"trace_id": traceID,
+		})
+	}
 
 	zapLogger.Info("Profile endpoint çağrıldı",
 		zap.String("trace_id", traceID),
-		zap.String("user_id", userID),
+		zap.String("session_id", sessionID),
 	)
 
-	// Session bilgilerini cache'den al
-	sessionKey := "session:" + userID
-	var sessionData map[string]interface{}
-	if err := cache.Get(sessionKey, &sessionData); err != nil {
-		zapLogger.Warn("Session cache'den alınamadı",
+	if authService == nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error":    "Auth service yapılandırılmamış",
+			"trace_id": traceID,
+		})
+	}
+
+	// Session'ı validate et
+	session, err := authService.ValidateSession(sessionID)
+	if err != nil {
+		zapLogger.Warn("Session validation başarısız",
 			zap.String("trace_id", traceID),
-			zap.String("user_id", userID),
+			zap.String("session_id", sessionID),
 			zap.Error(err),
 		)
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"error":    "Geçersiz veya süresi dolmuş oturum",
+			"trace_id": traceID,
+		})
 	}
 
 	profile := fiber.Map{
-		"user_id":  userID,
-		"name":     userName,
-		"email":    userEmail,
-		"roles":    userRoles,
-		"session":  sessionData,
-		"trace_id": traceID,
+		"user_id":       session.UserID,
+		"name":          session.Name,
+		"email":         session.Email,
+		"roles":         session.Roles,
+		"login_time":    session.LoginTime,
+		"last_activity": session.LastActivity,
+		"session_id":    session.ID,
+		"trace_id":      traceID,
 	}
 
 	return c.JSON(profile)

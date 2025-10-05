@@ -2,74 +2,85 @@ package models
 
 import (
 	"time"
-
-	"github.com/google/uuid"
-	"gorm.io/gorm"
 )
 
-// Role - Kullanıcı rolleri
-type Role struct {
-	ID          uuid.UUID `json:"id" gorm:"type:uuid;primary_key;default:gen_random_uuid()"`
-	Name        string    `json:"name" gorm:"uniqueIndex;not null"` // admin, user, moderator
-	Description string    `json:"description"`
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
-}
-
-// User - Kullanıcı modeli
+// User - Updated user model for Zitadel integration with normalized role relationship
 type User struct {
-	ID        uuid.UUID `json:"id" gorm:"type:uuid;primary_key;default:gen_random_uuid()"`
-	Name      string    `json:"name" gorm:"not null"`
-	Email     string    `json:"email" gorm:"uniqueIndex;not null"`
-	Age       int       `json:"age"`
-	Active    bool      `json:"active" gorm:"default:true"`
-	RoleID    uuid.UUID `json:"role_id" gorm:"type:uuid;not null"`
-	Role      Role      `json:"role" gorm:"foreignKey:RoleID;constraint:OnUpdate:CASCADE,OnDelete:RESTRICT"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	ID            uint      `gorm:"primaryKey" json:"id"`
+	ZitadelID     string    `gorm:"uniqueIndex;not null" json:"zitadel_id"`
+	Email         *string   `json:"email"` // Nullable for social logins, partial unique index
+	EmailVerified bool      `gorm:"default:false" json:"email_verified"`
+	Name          string    `json:"name"`
+	GivenName     string    `json:"given_name"`
+	FamilyName    string    `json:"family_name"`
+	Username      string    `json:"username"`
+	OrgID         string    `json:"org_id"`
+	ProjectID     string    `json:"project_id"`
+	IsActive      bool      `gorm:"default:true" json:"is_active"`
+	CreatedAt     time.Time `json:"created_at"`
+	UpdatedAt     time.Time `json:"updated_at"`
+
+	// Normalized role relationship (preferred over []string)
+	Roles []UserRole `gorm:"foreignKey:UserID" json:"roles"`
 }
 
-// BeforeCreate hook - ID oluştur
-func (u *User) BeforeCreate(tx *gorm.DB) error {
-	if u.ID == uuid.Nil {
-		u.ID = uuid.New()
-	}
-	return nil
+// UserRole - Normalized user-role relationship with multi-tenant support
+type UserRole struct {
+	ID        uint   `gorm:"primaryKey"`
+	UserID    uint   `gorm:"not null;index"`
+	Role      string `gorm:"not null"`
+	OrgID     string `gorm:"not null"`
+	ProjectID string `gorm:"not null"`
+	CreatedAt time.Time
+	UpdatedAt time.Time
+
+	// Composite unique index for role uniqueness per user/org/project
+	User User `gorm:"constraint:OnDelete:CASCADE"`
 }
 
-func (r *Role) BeforeCreate(tx *gorm.DB) error {
-	if r.ID == uuid.Nil {
-		r.ID = uuid.New()
-	}
-	return nil
+// ZitadelUserInfo - User information from Zitadel OIDC
+type ZitadelUserInfo struct {
+	Sub               string              `json:"sub"`
+	Name              string              `json:"name"`
+	GivenName         string              `json:"given_name"`
+	FamilyName        string              `json:"family_name"`
+	PreferredUsername string              `json:"preferred_username"`
+	Email             string              `json:"email"`
+	EmailVerified     bool                `json:"email_verified"`
+	Roles             []string            `json:"urn:zitadel:iam:org:project:roles"` // Configurable claim name
+	OrgID             string              `json:"urn:zitadel:iam:org:id"`
+	ProjectRoles      map[string][]string `json:"urn:zitadel:iam:org:project:roles:audience"` // Multi-project support
 }
 
-// CreateUserRequest - User oluşturma isteği
+// CreateUserRequest - User creation request for Zitadel integration
 type CreateUserRequest struct {
-	Name   string    `json:"name" validate:"required,min=2,max=100"`
-	Email  string    `json:"email" validate:"required,email"`
-	Age    int       `json:"age" validate:"min=0,max=150"`
-	Active *bool     `json:"active,omitempty"`
-	RoleID uuid.UUID `json:"role_id" validate:"required"`
+	ZitadelID     string  `json:"zitadel_id" validate:"required"`
+	Email         *string `json:"email,omitempty" validate:"omitempty,email"`
+	EmailVerified bool    `json:"email_verified"`
+	Name          string  `json:"name" validate:"required,min=1,max=100"`
+	GivenName     string  `json:"given_name"`
+	FamilyName    string  `json:"family_name"`
+	Username      string  `json:"username"`
+	OrgID         string  `json:"org_id" validate:"required"`
+	ProjectID     string  `json:"project_id" validate:"required"`
+	IsActive      *bool   `json:"is_active,omitempty"`
 }
 
-// UpdateUserRequest - User güncelleme isteği
+// UpdateUserRequest - User update request
 type UpdateUserRequest struct {
-	Name   *string    `json:"name,omitempty" validate:"omitempty,min=2,max=100"`
-	Email  *string    `json:"email,omitempty" validate:"omitempty,email"`
-	Age    *int       `json:"age,omitempty" validate:"omitempty,min=0,max=150"`
-	Active *bool      `json:"active,omitempty"`
-	RoleID *uuid.UUID `json:"role_id,omitempty"`
+	Email         *string `json:"email,omitempty" validate:"omitempty,email"`
+	EmailVerified *bool   `json:"email_verified,omitempty"`
+	Name          *string `json:"name,omitempty" validate:"omitempty,min=1,max=100"`
+	GivenName     *string `json:"given_name,omitempty"`
+	FamilyName    *string `json:"family_name,omitempty"`
+	Username      *string `json:"username,omitempty"`
+	IsActive      *bool   `json:"is_active,omitempty"`
 }
 
-// CreateRoleRequest - Role oluşturma isteği
-type CreateRoleRequest struct {
-	Name        string `json:"name" validate:"required,min=2,max=50"`
-	Description string `json:"description,omitempty"`
-}
-
-// UpdateRoleRequest - Role güncelleme isteği
-type UpdateRoleRequest struct {
-	Name        *string `json:"name,omitempty" validate:"omitempty,min=2,max=50"`
-	Description *string `json:"description,omitempty"`
+// UserRoleRequest - User role assignment request
+type UserRoleRequest struct {
+	UserID    uint   `json:"user_id" validate:"required"`
+	Role      string `json:"role" validate:"required"`
+	OrgID     string `json:"org_id" validate:"required"`
+	ProjectID string `json:"project_id" validate:"required"`
 }
