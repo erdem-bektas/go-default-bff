@@ -10,7 +10,6 @@ Bu proje, HashiCorp Vault ve Zitadel IAM kullanarak çoklu SaaS organizasyonlar�
 - **Zitadel**: Identity and Access Management (IAM)
 - **HashiCorp Vault**: Secret Management
 - **PostgreSQL**: Database
-- **Terraform**: Infrastructure as Code
 - **Docker**: Containerization
 - **Traefik**: Reverse Proxy (Production)
 
@@ -40,21 +39,7 @@ go-default-bff/
 │   ├── manage-saas-orgs.sh             # Local SaaS yönetimi
 │   └── test-services.sh                # Health check testleri
 │
-├── 🔧 TERRAFORM (Infrastructure as Code)
-│   ├── main.tf                         # Development config
-│   ├── organizations.tf                # Organization resources
-│   ├── policies.tf                     # Security policies
-│   ├── outputs.tf                      # Outputs
-│   ├── setup-admin-token.sh           # Admin token setup
-│   ├── get-zitadel-token.sh           # Token retrieval
-│   └── environments/
-│       └── production/                 # Production Terraform
-│           ├── main.tf                 # Production provider config
-│           ├── organizations.tf        # Production organizations
-│           ├── policies.tf            # Production security
-│           ├── outputs.tf             # Production outputs
-│           └── terraform.tfvars.example
-│
+
 ├── 🐳 DEPLOYMENT
 │   └── hetzner/                        # Hetzner production deployment
 │       ├── docker-compose.production.yml
@@ -127,65 +112,7 @@ docker-compose -f docker-compose.production.yml up -d
 ./manage-production-saas.sh create
 ```
 
-## 🔧 Terraform Konfigürasyonu
 
-### Development Organizations (SP1, SP2)
-```hcl
-# terraform/main.tf
-saas_organizations = {
-  sp1 = {
-    name = "SaaS Project 1"
-    domain = "sp1.localhost"
-    admin_email = "admin@sp1.localhost"
-    admin_password = "SP1AdminPass123!"
-    features = {
-      login_policy_allow_register = true
-      password_complexity_policy = { min_length = 8 }
-    }
-  }
-  sp2 = {
-    name = "SaaS Project 2" 
-    domain = "sp2.localhost"
-    admin_email = "admin@sp2.localhost"
-    admin_password = "SP2AdminPass123!"
-    features = {
-      login_policy_allow_register = false
-      password_complexity_policy = { min_length = 10 }
-    }
-  }
-}
-```
-
-### Production Organizations (SaaS1, SaaS2)
-```hcl
-# terraform/environments/production/main.tf
-production_saas_organizations = {
-  saas1 = {
-    name = "Production SaaS 1"
-    domain = "saas1.yourdomain.com"
-    admin_email = "admin@saas1.yourdomain.com"
-    admin_password = "ProductionSecurePassword123!"
-    features = {
-      login_policy_allow_register = false  # Production'da kapalı
-      password_complexity_policy = { min_length = 12 }  # Daha güçlü
-    }
-  }
-}
-```
-
-### Terraform Resources Created
-```hcl
-# Her SaaS için oluşturulan kaynaklar:
-resource "zitadel_org" "saas_orgs"                    # Organization
-resource "zitadel_human_user" "org_admins"            # Admin users
-resource "zitadel_org_member" "org_owners"            # Role assignments
-resource "zitadel_project" "saas_projects"            # Projects
-resource "zitadel_application_oidc" "saas_apps"       # OAuth apps
-resource "zitadel_project_role" "user_roles"          # Custom roles
-resource "zitadel_login_policy" "org_login_policies"  # Login policies
-resource "zitadel_password_complexity_policy"         # Password policies
-resource "vault_generic_secret" "saas_oauth_credentials" # Vault storage
-```
 
 ## 🔐 Vault Secret Structure
 
@@ -353,18 +280,7 @@ docker-compose -f docker-compose.production.yml up -d
 open https://grafana.yourdomain.com
 ```
 
-### Terraform Commands
-```bash
-# Development
-./manage-saas-orgs.sh plan     # Show plan
-./manage-saas-orgs.sh create   # Create orgs
-./manage-saas-orgs.sh destroy  # Destroy orgs
 
-# Production
-./deploy/hetzner/manage-production-saas.sh plan
-./deploy/hetzner/manage-production-saas.sh create
-./deploy/hetzner/manage-production-saas.sh status
-```
 
 ## 🧪 Testing & Validation
 
@@ -426,32 +342,11 @@ curl https://vault.yourdomain.com/v1/sys/health
 ### Adding New SaaS Organization
 ```hcl
 # 1. Update terraform variables
-saas_organizations = {
-  sp1 = { ... }
-  sp2 = { ... }
-  sp3 = {  # New SaaS
-    name = "SaaS Project 3"
-    domain = "sp3.localhost"
-    admin_email = "admin@sp3.localhost"
-    admin_password = "SP3AdminPass123!"
-    features = { ... }
-  }
-}
-
-# 2. Apply changes
-terraform apply
-```
-
-### Custom Security Policies
-```hcl
-# terraform/policies.tf
-resource "zitadel_password_complexity_policy" "custom_policy" {
-  min_length = 16      # Very strong
-  has_uppercase = true
-  has_lowercase = true  
-  has_number = true
-  has_symbol = true
-}
+# Manual organization creation through Zitadel UI or API
+# Organizations can be created directly through:
+# 1. Zitadel Admin Console
+# 2. Direct API calls  
+# 3. Custom scripts using Zitadel API
 ```
 
 ### Integration with External Systems
@@ -481,9 +376,8 @@ vault status
 curl http://localhost:8080/debug/ready
 docker logs zitadel-zitadel-1
 
-# Terraform state issues
-terraform refresh
-terraform import zitadel_org.saas_orgs["sp1"] ORG_ID
+# Organization management issues
+# Use Zitadel Admin Console or API for manual fixes
 
 # SSL certificate issues (production)
 docker logs traefik
@@ -510,8 +404,7 @@ docker-compose -f docker-compose.production.yml logs
 - `deploy/hetzner/manage-production-saas.sh` - Production SaaS management
 
 ### Configuration Files
-- `terraform/main.tf` - Development Terraform
-- `terraform/environments/production/main.tf` - Production Terraform
+
 - `deploy/hetzner/docker-compose.production.yml` - Production services
 - `deploy/hetzner/.env.production.example` - Production environment
 
