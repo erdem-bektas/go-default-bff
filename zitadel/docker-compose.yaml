@@ -127,10 +127,10 @@ services:
     ports:
       - 5432:5432
     volumes:
-      - 'data:/var/lib/postgresql/data:rw'
+      - 'zitadel-postgres-data:/var/lib/postgresql/data:rw'
 
 networks:
   zitadel:
 
 volumes:
-  data:
+  zitadel-postgres-data:

@@ -1,0 +1,39 @@
+version: '3.8'
+
+services:
+  express-saas:
+    build: .
+    ports:
+      - "3001:3001"
+    environment:
+      - NODE_ENV=development
+      - PORT=3001
+      - VAULT_ADDR=http://vault:8200
+      - VAULT_TOKEN=dev-root
+      - SESSION_SECRET=docker-session-secret-change-in-production
+    depends_on:
+      - redis
+    networks:
+      - saas-network
+    volumes:
+      - .:/app
+      - /app/node_modules
+    command: npm run dev
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    networks:
+      - saas-network
+    command: redis-server --appendonly yes
+    volumes:
+      - redis-data:/data
+
+networks:
+  saas-network:
+    external: true
+    name: zitadel_zitadel
+
+volumes:
+  redis-data:
